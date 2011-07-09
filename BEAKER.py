@@ -142,7 +142,135 @@ class model():
         self.kinpy_model = kinpy_code.reaction_model()
         #Make a shortcut to the run function
         self.run = self.kinpy_model.run
+        #Make a shortcut to the reactants set
+        self.reactants = self.kinpy_model.reactants
 
+class data():
+
+    """
+    Class to hold the experiment objects
+
+    This class maintains a list of experiment objects and their unique identifiers. It implements
+    functions to add and remove experiment objects.
+    """
+
+    def __init__(self,session):
+
+        """Initiates a new data object"""
+
+        #Make the parent session object accessible
+        self.session = session
+        #Create an empty dictionary to hold experiment objects
+        self.experiments = {}
+        #Initiate the id variable
+        self.id_counter = 0
+
+    def new_id(self):
+
+        """Returns the next unique id and increments the id variable"""
+
+        #Pick the next id
+        next_id = self.id_counter
+        #Increment the counter
+        self.id_counter += 1
+        #Return the new id
+        return next_id
+
+    def add_experiment(self):
+
+        """
+        Creates a new experiment object
+
+        A new experiment object is created and stored temporarily in the current_experiment variable.
+        The experiment is not added to the experiments list until the save() function is called.
+        """
+
+        #Pick an id for the new experiment
+        current_id = self.new_id()
+        #Create the experiment object
+        self.current_experiment = experiment(self.session,current_id)
+
+    def delete_experiment(self,experiment_id):
+
+        """Removes an experiment from the experiments list"""
+
+        del self.experiments[experiment_id]
+
+    def modify_experiment(self,experiment_id):
+
+        """Moves an experiment from the experiments list to the temporary store"""
+
+        #Copy the experiment into the temporary store
+        self.current_experiment = self.experiments[experiment_id]
+        #Delete the experiment from the experiments list
+        self.delete_experiment(experiment_id)
+
+    def save_experiment(self):
+
+        """Saves the current experiment into the experiments list"""
+
+        #Check the experiment object
+        self.current_experiment.check()
+        #Copy to the experiment list
+        self.experiments[self.current_experiment.id] = self.current_experiment
+        #Clear the temporary store
+        del self.current_experiment
+
+class experiment():
+
+    """A class to hold experimental data
+
+    The experiment class holds experimental results for the system under a single specified set of
+    conditions. Each chemical species (reactant) present in the model definition must be present in
+    each experiment object. An initial concentration must be supplied for each chemical species, as
+    these form the starting conditions for the modelling. Additionally, each chemical species may be
+    associated with a concentration series or a rate of change if these data were collected. In this
+    case the data is used to estimate kinetic rate constants for the model system.
+    """
+
+    def __init__(self,session,experiment_id):
+
+        """Initiates a new experiment object"""
+
+        #Make the parent session object accessible
+        self.session = session
+
+        #Set the experiment id
+        self.id = experiment_id
+        #Create the data dictionary
+        self.data = self.new_data_dictionary()
+        #Create the data importer
+        self.importer = importer(self)
+        #Create a tuple of valid classes for data objects
+        self.data_classes = (initial_concentration,time_series,rate)
+
+    def new_data_dictionary(self):
+
+        """Creates a new, empty data dictionary"""
+
+        #Get the list of reactants for the model
+        reactants = session.model.reactants
+        #Create a dictionary
+        reactant_dictionary = {}
+        #Create an empty entry in the data dictionary for each of the reactants
+        for reactant in reactants:
+            reactant_dictionary[reactant] = None
+        #Return the dictionary
+        return reactant_dictionary
+
+    def assign_reactant(self,reactant,reactant_data):
+
+        """Assigns an initial_condition, time_series or rate object to a reactant in the dictionary"""
+
+        #Check to make sure the reactant_data is valid
+        if not isinstance(reactant_data,self.data_classes):
+            raise Exception('Data supplied is not an initial_concentration, time_series or rate object.')
+        #Assign the data to the reactant
+        self.data[reactant] = reactant_data
+
+    def save
+        
+    def starting_concentrations(
     
 class model_solver():
     def __init__(self,session):
