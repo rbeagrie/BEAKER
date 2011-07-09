@@ -143,7 +143,7 @@ def generate(input_file,output_file):
         else:
             ofstr += "1.0,\\\n        ])\n\n        "
 
-    ofstr += "\n\n        self.reactants = set(\n        "        
+    ofstr += "\n\n        self.reactants = list(\n        "        
     for n in range(0, i + 1):
         if n != i:
             ofstr += "'" + chem_dict_r[n] + "',\n        "

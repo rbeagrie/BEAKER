@@ -243,6 +243,19 @@ class experiment():
         self.importer = importer(self)
         #Create a tuple of valid classes for data objects
         self.data_classes = (initial_concentration,time_series,rate)
+        #Set the flags to an unchecked state
+        self.reset_flags()
+
+    def reset_flags(self):
+
+        """Resets various flags to ensure experiment is properly checked after changes have been made"""
+        
+        #This experiment has not been checked yet
+        self.checked = False
+        #Erase starting_concentration cache
+        self.cached_concentrations = False
+        #Erase time cache
+        self.cached_time = False
 
     def new_data_dictionary(self):
 
@@ -267,10 +280,99 @@ class experiment():
             raise Exception('Data supplied is not an initial_concentration, time_series or rate object.')
         #Assign the data to the reactant
         self.data[reactant] = reactant_data
+        self.reset_flags()
 
-    def save
+    def check(self,autocomplete=False):
+
+        """Checks the reactant dictionary to ensure all reactants are assigned correctly"""
+
+        #If this experiment has been checked previously, don't check again
+        if (self.checked): return True
+
+        #If autocomplete is true, autocomplete before checking
+        if autocomplete: self.autocomplete()
+
+        #This experiment has been checked
+        self.checked = True
+
+        #Check the reactant set matches that of the model
+        if not set(self.data.keys()) = set(self.session.model.reactants):
+            raise Exception('Reactants are not all assigned for this reaction')
+            #Failed the check
+            self.checked = False
+            return False
+
+        #Check all reactants are set correctly
+        for reactant_data in data:
+            if not isinstance(reactant_data,self.data_classes):
+                raise Exception('Assigned data is not an initial_concentration, time_series or rate object.')
+                #Failed the check
+                self.checked = False
+                break
+
+        return self.checked
+
+    def auto_complete(self):
+
+        """Sets all unassigned reactants to an initial concentration of 0"""
+
+        #If experiment has been checked, it must be complete
+        if self.checked:
+            return True
+
+        for reactant in self.data.keys()
+            if type(self.data[reactant]) == None:
+                self.data[reactant] = initial_concentration()
+
+    def starting_concentrations(self):
+
+        """Returns a list of starting concentrations for passing to the modeller"""
+
+        #Make sure the experiment has passed a check
+        if not self.check():
+            return False
+
+        #Check for a cached version
+        if self.cached_concentrations:
+            return self.cached_concentrations
+
+        #Create an empty list to store the concentrations
+        starting_concentrations = list()
+
+        #Add each starting concentration in the order specified by the model
+        for reactant in self.session.model.reactants:
+            starting_concentrations.append(self.reactant_dictionary[reactant].starting_concentration())
         
-    def starting_concentrations(
+        #return the starting concentration list
+        return starting_concentrations
+
+    def time_points(self):
+
+        """Returns a list of all time points present in the experimental data"""
+
+        #Make sure the experiment has passed a check
+        if not self.check():
+            return False
+
+        #Check for a cached version
+        if self.cached_time:
+            return self.cached_time
+
+        #Create an empty set to store the time points
+        time_points = set()
+
+        #Add time points to the set
+        for reactant_data in self.data:
+            for point in reactant_data.time_points()
+                time_points.add(point)
+
+        #convert the set to a list and order it
+        sorted_time_points = list(time_points)
+        sorted_time_points = sorted_time_points.sort()
+        
+        #return the starting concentration list
+        return sorted_time_points
+        
     
 class model_solver():
     def __init__(self,session):
