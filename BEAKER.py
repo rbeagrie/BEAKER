@@ -1,6 +1,6 @@
 """BEAKER is an open source program designed for modelling enzymatic reactions."""
 
-import os, logging, cPickle
+import os, logging, cPickle, kinpy, sys
 
 class session():
 
@@ -20,8 +20,12 @@ class session():
 
         #Set the home directory
         if not directory:
-            directory = os.path.expanduser('~\\BEAKER\\' + name)
+            directory = os.path.join(os.path.expanduser('~\\BEAKER\\'),self.name)
         self.directory = directory
+
+        #Check the home directory exists, if not create it
+        if not os.path.isdir(directory):
+            os.makedirs(directory)
 
         #Set the debugging level
         log_level = getattr(logging, debug.upper())
@@ -65,4 +69,81 @@ class session():
         f = open(save_file, 'w')
         cPickle.dump(self,f)
         f.close()
+
+class model():
+
+    """
+    Class to hold the reaction model
+
+    This class holds the set of differential equations and variables (or 'model')
+    which we use to simulate a chemical reaction in silico. It contains fuctions
+    to generate this model using an input file and the kinpy script (a source
+    code generator provided by Akshay Srinivasan).
+    """
+
+    def __init__(self,session,input_file):
+
+        """Initiates a new model object"""
+
+        #Make the parent session object accessible
+        self.session = session
+
+        #Run a function to parse the input file
+        self.parse_input_file(input_file)
+
+    def parse_input_file(self,input_file):
+
+        """Checks the type of model file supplied and handles it appropriately"""
+
+        #Check that the model file exists
+        if not os.path.exists(input_file):
+            raise IOError('Model file does not exist')
         
+        #Check the extension of the model file
+        root,ext = os.path.splitext(input_file)
+        if ext == '.k':
+            #Input is a kinpy file, so run kinpy
+            self.run_kinpy(input_file)
+        elif ext == '.py':
+            #Input is kinpy generated code, so import it
+            self.import_kinpy(input_file)
+        else:
+            #Could not determine file type
+            raise Exception('Could not determine the input file type')
+
+    def run_kinpy(self,model_file):
+
+        """Passes a kinpy file to kinpy, then imports the resulting source code"""
+
+        #Set an output file
+        output_file = os.path.join(self.session.directory,'kinpy_code.py')
+        #Run kinpy
+        kinpy.generate(model_file,output_file)
+        #Import the kinpy code
+        self.import_kinpy(output_file)
+
+    def import_kinpy(self,code_file):
+
+        """Imports the generated kinpy code as a new module"""
+
+        #Get the path of the parent directory
+        path, filename = os.path.split(code_file)
+        #Get the module name
+        filename, ext = os.path.splitext(filename)
+        #Add the parent directory to the PYTHONPATH
+        sys.path.insert(0, path)
+        #Import the module
+        kinpy_code = __import__(filename)
+        #Make sure module is most recent version
+        reload(kinpy_code)
+        #Remove parent directory from PYTHONPATH
+        del sys.path[0]
+        #Make a new reaction_model object
+        self.kinpy_model = kinpy_code.reaction_model()
+        #Make a shortcut to the run function
+        self.run = self.kinpy_model.run
+
+    
+class model_solver():
+    def __init__(self,session):
+        self.blank = 'placeholder'
