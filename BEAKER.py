@@ -97,7 +97,7 @@ class model():
 
         #Check that the model file exists
         if not os.path.exists(input_file):
-            raise IOError('Model file does not exist')
+            raise BeakerException('Model file does not exist')
         
         #Check the extension of the model file
         root,ext = os.path.splitext(input_file)
@@ -109,7 +109,7 @@ class model():
             self.import_kinpy(input_file)
         else:
             #Could not determine file type
-            raise Exception('Could not determine the input file type')
+            raise BeakerException('Could not determine the input file type')
 
     def run_kinpy(self,model_file):
 
@@ -133,7 +133,10 @@ class model():
         #Add the parent directory to the PYTHONPATH
         sys.path.insert(0, path)
         #Import the module
-        kinpy_code = __import__(filename)
+        try:
+            kinpy_code = __import__(filename)
+        except:
+            raise BeakerException('Not a valid kinpy code file')
         #Make sure module is most recent version
         reload(kinpy_code)
         #Remove parent directory from PYTHONPATH
@@ -277,7 +280,7 @@ class experiment():
 
         #Check to make sure the reactant_data is valid
         if not isinstance(reactant_data,self.data_classes):
-            raise Exception('Data supplied is not an initial_concentration, time_series or rate object.')
+            raise BeakerException('Data supplied is not an initial_concentration, time_series or rate object.')
         #Assign the data to the reactant
         self.data[reactant] = reactant_data
         self.reset_flags()
@@ -296,8 +299,8 @@ class experiment():
         self.checked = True
 
         #Check the reactant set matches that of the model
-        if not set(self.data.keys()) = set(self.session.model.reactants):
-            raise Exception('Reactants are not all assigned for this reaction')
+        if not set(self.data.keys()) == set(self.session.model.reactants):
+            raise BeakerException('Reactants are not all assigned for this reaction')
             #Failed the check
             self.checked = False
             return False
@@ -305,7 +308,7 @@ class experiment():
         #Check all reactants are set correctly
         for reactant_data in data:
             if not isinstance(reactant_data,self.data_classes):
-                raise Exception('Assigned data is not an initial_concentration, time_series or rate object.')
+                raise BeakerException('Assigned data is not an initial_concentration, time_series or rate object.')
                 #Failed the check
                 self.checked = False
                 break
@@ -320,7 +323,7 @@ class experiment():
         if self.checked:
             return True
 
-        for reactant in self.data.keys()
+        for reactant in self.data.keys():
             if type(self.data[reactant]) == None:
                 self.data[reactant] = initial_concentration()
 
@@ -341,7 +344,7 @@ class experiment():
 
         #Add each starting concentration in the order specified by the model
         for reactant in self.session.model.reactants:
-            starting_concentrations.append(self.reactant_dictionary[reactant].starting_concentration())
+            starting_concentrations.append(self.reactant_dictionary[reactant].starting_concentration)
         
         #return the starting concentration list
         return starting_concentrations
@@ -358,22 +361,87 @@ class experiment():
         if self.cached_time:
             return self.cached_time
 
-        #Create an empty set to store the time points
-        time_points = set()
+        #Create empty sets to store the time points
+        concentration_time_points = set()
+        rate_time_points = set()
 
         #Add time points to the set
         for reactant_data in self.data:
-            for point in reactant_data.time_points()
-                time_points.add(point)
 
-        #convert the set to a list and order it
-        sorted_time_points = list(time_points)
-        sorted_time_points = sorted_time_points.sort()
+            if isinstance(reactant_data,time_course):
+                for point in reactant_data.time_points:
+                    concentration_time_points.add(point)
+            elif isinstance(reactant_data,rate):
+                rate_time_points.add(reactant_data.time)
+
+        #convert the sets to lists and order them
+        conc_time_list = list(concentration_time_points)
+        rate_time_list = list(rate_time_points)
+        conc_time_list = conc_time_list.sort()
+        rate_time_list = rate_time_list.sort()
+
+        #Cache the time points
+        self.cached_time = (conc_time_list,rate_time_list)
         
         #return the starting concentration list
-        return sorted_time_points
-        
+        return (conc_time_list,rate_time_list)
+
+class time_course():
+
+    """Stores a series of concentration measurements over time"""
+
+    def __init__(self,times,concentrations,starting_concentration=False):
+
+        """Initiates a new time_course object"""
+
+        #Check that a starting concentration was provided
+        if not starting_concentration:
+            if times[0] == 0:
+                starting_concentration = concentrations[0]
+            else:
+                raise BeakerException('No starting concentration provided.')
+
+        #Check that time and concentration are the same length
+        if not len(times) == len(concentrations):
+            raise BeakerException('Time and concentration arrays must be the same length')
+              
+        #Create the variables
+        self.time_points = times
+        self.concentrations = concentrations
+        self.starting_concentration = starting_concentration
+
+class rate():
+
+    """Stores a reaction rate"""
+
+    def __init__(self,rate,time,initial_concentration):
+
+        """Initiates a new rate object"""
+
+        #Create the variables
+        self.rate = rate
+        self.time = time
+        self.initial_concentration = initial_concentration
+
+class initial_concentration():
+
+    """Stores an initial concentration"""
+
+    def __init__(self,initial_concentration):
+
+        """Initiates a new initial_concentration object"""
+
+        #Create the variable
+        self.initial_concentration = initial_concentration
     
 class model_solver():
     def __init__(self,session):
         self.blank = 'placeholder'
+    
+class importer():
+    def __init__(self,experiment):
+        self.blank = 'placeholder'
+
+class BeakerException(Exception):
+    def blank(self):
+        return True

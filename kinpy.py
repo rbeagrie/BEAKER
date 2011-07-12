@@ -112,7 +112,7 @@ def generate(input_file,output_file):
 
     ofstr += "class reaction_model():\n\n"
         
-    ofstr += "    def dy(self, params, t):\n\n        y,k = params\n\n        "
+    ofstr += "    def dy(self, y, t, k):\n\n        "
 
     for term in reac_list:
         ofstr += term + "\n\n        "
@@ -130,10 +130,10 @@ def generate(input_file,output_file):
     for n in range(0, i + 1):
         if n != i:
             ofstr += "#" + chem_dict_r[n] + "\n        "
-            ofstr += "0.0,\\\n        "
+            ofstr += "0.5,\\\n        "
         else:
             ofstr += "#" + chem_dict_r[n] + "\n        "
-            ofstr += "0.0,\\\n        ])\n\n        "
+            ofstr += "0.5,\\\n        ])\n\n        "
     #ofstr = ofstr[0:-3] + "\\\n])"
 
     ofstr += "\n\n        self.debug_k = array([\\\n        "        
@@ -143,16 +143,16 @@ def generate(input_file,output_file):
         else:
             ofstr += "1.0,\\\n        ])\n\n        "
 
-    ofstr += "\n\n        self.reactants = list(\n        "        
+    ofstr += "\n\n        self.reactants = list([\n        "        
     for n in range(0, i + 1):
         if n != i:
             ofstr += "'" + chem_dict_r[n] + "',\n        "
         else:
-            ofstr += "'" + chem_dict_r[n] + "')\n        "
+            ofstr += "'" + chem_dict_r[n] + "'])\n        "
 
-    ofstr += "\n    def run(self,y0,k,t):\n\n        "
+    ofstr += "\n    def run(self,y0,t,k):\n\n        "
 
-    ofstr += "return itg.odeint(dy, (y0,k), t)"
+    ofstr += "return itg.odeint(self.dy, y0, t, (k,))"
 
     #print ofstr
     of.write(ofstr)
