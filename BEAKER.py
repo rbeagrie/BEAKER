@@ -1,6 +1,7 @@
 """BEAKER is an open source program designed for modelling enzymatic reactions."""
 
-import os, logging, cPickle, kinpy, sys
+import os, logging, cPickle, kinpy, sys, csv, numpy as np
+from scipy import optimize
 
 class session():
 
@@ -143,10 +144,40 @@ class model():
         del sys.path[0]
         #Make a new reaction_model object
         self.kinpy_model = kinpy_code.reaction_model()
-        #Make a shortcut to the run function
-        self.run = self.kinpy_model.run
         #Make a shortcut to the reactants set
         self.reactants = self.kinpy_model.reactants
+
+    def run(self,times,starting_concentrations,parameters):
+
+        """Run the model and return concentrations and rates of change for all reactants"""
+
+        #Create a dictionary to hold the results
+        run_results = {}
+        #Get concentrations for all reactants and time points
+        concentrations = self.kinpy_model.run(starting_concentrations,times,parameters)
+        #Get rates for all reactants and time points
+        rates = self.get_rates(concentrations,parameters)
+        concentrations = concentrations.transpose()
+        rates = rates.transpose()
+        #Assemble results into a dictionary
+        for i,reactant in enumerate(self.reactants):
+            run_results[reactant] = {}
+            run_results[reactant]['conc'] = concentrations[i]
+            run_results[reactant]['rate'] = rates[i]
+            run_results[reactant]['time'] = times
+        #Return the dictionary
+        return run_results
+
+    def get_rates(self,concentrations,parameters):
+
+        """Run the model, returning rates of change for all reactants"""
+
+        #Create a list to hold the results
+        results = []
+        for i,y in enumerate(concentrations):
+            results.append(self.kinpy_model.dy(y,0,parameters))
+
+        return np.array(results)
 
 class data():
 
@@ -208,12 +239,12 @@ class data():
         #Delete the experiment from the experiments list
         self.delete_experiment(experiment_id)
 
-    def save_experiment(self):
+    def save_experiment(self,autocomplete=False):
 
         """Saves the current experiment into the experiments list"""
 
         #Check the experiment object
-        self.current_experiment.check()
+        self.current_experiment.check(autocomplete)
         #Copy to the experiment list
         self.experiments[self.current_experiment.id] = self.current_experiment
         #Clear the temporary store
@@ -257,20 +288,21 @@ class experiment():
         self.checked = False
         #Erase starting_concentration cache
         self.cached_concentrations = False
-        #Erase time cache
+        #Erase concentration_times cache
         self.cached_time = False
+        #Erase rate_times cache
 
     def new_data_dictionary(self):
 
         """Creates a new, empty data dictionary"""
 
         #Get the list of reactants for the model
-        reactants = session.model.reactants
+        reactants = self.session.model.reactants
         #Create a dictionary
         reactant_dictionary = {}
         #Create an empty entry in the data dictionary for each of the reactants
         for reactant in reactants:
-            reactant_dictionary[reactant] = None
+            reactant_dictionary[reactant] = False
         #Return the dictionary
         return reactant_dictionary
 
@@ -285,6 +317,13 @@ class experiment():
         self.data[reactant] = reactant_data
         self.reset_flags()
 
+    def set_starting_concentrations(self,concentrations):
+
+        """Accepts a list of reactant:concentration pairs and assigns them to reactants"""
+
+        for reactant in concentrations:
+            self.data[reactant] = initial_concentration(concentrations[reactant])
+
     def check(self,autocomplete=False):
 
         """Checks the reactant dictionary to ensure all reactants are assigned correctly"""
@@ -293,7 +332,7 @@ class experiment():
         if (self.checked): return True
 
         #If autocomplete is true, autocomplete before checking
-        if autocomplete: self.autocomplete()
+        if autocomplete: self.auto_complete()
 
         #This experiment has been checked
         self.checked = True
@@ -306,8 +345,9 @@ class experiment():
             return False
 
         #Check all reactants are set correctly
-        for reactant_data in data:
-            if not isinstance(reactant_data,self.data_classes):
+        for reactant in self.data:
+            if not self.data[reactant]:
+                print self.data[reactant]
                 raise BeakerException('Assigned data is not an initial_concentration, time_series or rate object.')
                 #Failed the check
                 self.checked = False
@@ -323,8 +363,8 @@ class experiment():
         if self.checked:
             return True
 
-        for reactant in self.data.keys():
-            if type(self.data[reactant]) == None:
+        for reactant in self.data:
+            if not self.data[reactant]:
                 self.data[reactant] = initial_concentration()
 
     def starting_concentrations(self):
@@ -344,14 +384,14 @@ class experiment():
 
         #Add each starting concentration in the order specified by the model
         for reactant in self.session.model.reactants:
-            starting_concentrations.append(self.reactant_dictionary[reactant].starting_concentration)
+            starting_concentrations.append(self.data[reactant].starting_concentration)
         
         #return the starting concentration list
         return starting_concentrations
 
-    def time_points(self):
+    def times(self):
 
-        """Returns a list of all time points present in the experimental data"""
+        """Return a list of the time points present in the experimental data"""
 
         #Make sure the experiment has passed a check
         if not self.check():
@@ -361,32 +401,28 @@ class experiment():
         if self.cached_time:
             return self.cached_time
 
-        #Create empty sets to store the time points
-        concentration_time_points = set()
-        rate_time_points = set()
+        #Create an empty set to store the time points
+        time_points = set()
 
         #Add time points to the set
-        for reactant_data in self.data:
+        for reactant in self.data:
+            if isinstance(self.data[reactant],time_series):
+                for point in self.data[reactant].time_points:
+                    time_points.add(point)
+            elif isinstance(self.data[reactant],rate):
+                time_points.add(self.data[reactant].time)
 
-            if isinstance(reactant_data,time_course):
-                for point in reactant_data.time_points:
-                    concentration_time_points.add(point)
-            elif isinstance(reactant_data,rate):
-                rate_time_points.add(reactant_data.time)
-
-        #convert the sets to lists and order them
-        conc_time_list = list(concentration_time_points)
-        rate_time_list = list(rate_time_points)
-        conc_time_list = conc_time_list.sort()
-        rate_time_list = rate_time_list.sort()
+        #convert the set to a list and order it
+        time_list = list(time_points)
+        time_list.sort()
 
         #Cache the time points
-        self.cached_time = (conc_time_list,rate_time_list)
-        
-        #return the starting concentration list
-        return (conc_time_list,rate_time_list)
+        self.cached_time = time_list
 
-class time_course():
+        #Return the time points
+        return self.cached_time
+
+class time_series():
 
     """Stores a series of concentration measurements over time"""
 
@@ -396,7 +432,7 @@ class time_course():
 
         #Check that a starting concentration was provided
         if not starting_concentration:
-            if times[0] == 0:
+            if times[0] == 0.0:
                 starting_concentration = concentrations[0]
             else:
                 raise BeakerException('No starting concentration provided.')
@@ -414,34 +450,192 @@ class rate():
 
     """Stores a reaction rate"""
 
-    def __init__(self,rate,time,initial_concentration):
+    def __init__(self,rate,time,starting_concentration):
 
         """Initiates a new rate object"""
 
         #Create the variables
         self.rate = rate
         self.time = time
-        self.initial_concentration = initial_concentration
+        self.starting_concentration = starting_concentration
 
 class initial_concentration():
 
     """Stores an initial concentration"""
 
-    def __init__(self,initial_concentration):
+    def __init__(self,starting_concentration=0.0):
 
         """Initiates a new initial_concentration object"""
 
         #Create the variable
-        self.initial_concentration = initial_concentration
-    
-class model_solver():
-    def __init__(self,session):
-        self.blank = 'placeholder'
+        self.starting_concentration = starting_concentration
     
 class importer():
+
+    """Handles the extraction of data from flat text files"""
+    
     def __init__(self,experiment):
-        self.blank = 'placeholder'
+
+        """Initiates a new importer object"""
+
+        #Make the parent experiment available
+        self.experiment = experiment
+        #Create the variable
+        self.dictionary = False
+
+    def text_to_dictionary(self,text_file,delimiter='\t'):
+
+        """Converts a text file to a dictionary object"""
+
+        #Open the text file
+        text_file = open(text_file,'r')
+        #Pass it to the csv reader
+        data_object = csv.DictReader(text_file,delimiter=delimiter)
+
+        #Create the dictionary object
+        data_dictionary = {}
+        for field in data_object.fieldnames:
+            data_dictionary[field] = []
+
+        #Read the data into the dictionary
+        for row in data_object:
+            for key in row:
+                data_dictionary[key].append(float(row[key]))
+
+        #Return the dictionary
+        return data_dictionary
+
+    def import_time_series(self,text_file,delimiter='\t',time_key='T'):
+
+        """Converts a text file to a dictionary of time_series objects"""
+
+        #Create the initial dictionary
+        temp_dictionary = self.text_to_dictionary(text_file,delimiter=delimiter)
+
+        #Create the storage dictionary
+        self.dictionary = {}
+
+        #Convert lists to time series
+        for key in temp_dictionary:
+            if not key == time_key:
+                self.dictionary[key] = time_series(temp_dictionary[time_key],temp_dictionary[key])
+
+    def assign(self,dictionary_key,model_key):
+
+        """Assigns imported data to the experiment"""
+
+        #Assign the data
+        self.experiment.assign_reactant(model_key,self.dictionary[dictionary_key])
+                
+    
+class model_solver():
+
+    """Fits the provided data to the model to give a best fit set of model parameters"""
+    
+    def __init__(self,session):
+
+        """Initiates the model_solver object"""
+
+        #Make the session available
+        self.session = session
+        #create a dictionary of function solvers
+        self.solver = {'simplex':optimize.fmin,'anneal':optimize.anneal}
+
+    def solve(self,method='simplex',initial_guess=False):
+
+        """Fit the session data to the model and return an estimate of the model parameters"""
+
+        #Check to see if an initial guess for the parameters was given
+        if not initial_guess:
+            #if not, set every parameter to 1
+            initial_guess = []
+            for i in range(len(self.session.model.kinpy_model.debug_k)):
+                initial_guess.append(1.0)
+
+        #Check to ensure the initial_guess is of the correct length
+        if not len(initial_guess) == len(self.session.model.kinpy_model.debug_k):
+            raise BeakerException('Initial guess does not have the right number of elements')
+
+        #Solve the model by minimizing the least square difference between the model and the data
+        print self.solver[method](self.total_square_difference,initial_guess)
+
+    def total_square_difference(self,parameters):
+
+        """Calculate the square difference between the model and the data"""
+
+        total = 0
+
+        #Check to ensure none of the parameters is negative
+        for i,v in enumerate(parameters):
+            if v < 0:
+                parameters[i] = 0 - v
+
+        for id in self.session.data.experiments:
+
+            #Get the experiment object 
+            experiment = self.session.data.experiments[id]
+
+            #Get the starting concentrations    
+            starting_concentrations = experiment.starting_concentrations()
+
+            #Run the model for the time points in the experimental data
+            modelled_data = self.session.model.run(experiment.times(),starting_concentrations,parameters)
+
+            #Calculate the difference between model and data for each reactant
+            for reactant in self.session.model.reactants:
+                observed = experiment.data[reactant]
+
+                #Use concentration data if the reactant is a time_series
+                if isinstance(experiment.data[reactant],time_series):
+                    expected = self.subset_conc(modelled_data[reactant],observed)
+                    #Calculate the square difference and add it to the running total
+                    total += self.conc_square_difference(expected,observed)
+
+                #Use rate data if the reactant is a rate object    
+                elif isinstance(experiment.data[reactant],rate):
+                    expected = self.subset_rate(modelled_data[reactant],observed)
+                    #Calculate the suqare difference and add it to the running total
+                    total += expected.sq_diff(observed)
+
+        #Return the total squared difference
+        return total
+
+    def conc_square_difference(self,expected,observed):
+
+        """Return the square difference between calculated and observed concentrations"""
+
+        total = 0
+
+        for i,a in enumerate(expected.concentrations):
+            total += self.point_square_difference(a,observed.concentrations[i])
+
+        return total
+
+    def point_square_difference(self,a,b):
+
+        """Return the square difference of a and b"""
+
+        return ((a - b)**2)
+
+    def subset_conc(self,expected,observed):
+
+        """Return only the expected concentrations calculated for time points present in the observed concentrations"""
+
+        data_subset = []
+        
+        for time in observed.time_points:
+            data_subset.append(expected['conc'][expected['time'].index(time)])
+
+        return time_series(observed.time_points,data_subset)
+
+    def subset_rate(self,expected,observed):
+
+        """Return only the expected rate calculated for time of the observed rate"""
+
+        return expected['rate'][expected['time'].index(observed.time)]
+
+        
+        
 
 class BeakerException(Exception):
-    def blank(self):
-        return True
+    pass
