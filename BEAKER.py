@@ -198,6 +198,9 @@ class data():
         self.experiments = {}
         #Initiate the id variable
         self.id_counter = 0
+        #Initiate the importers
+        self.concentration_importer = concentration_importer(self)
+        #self.rate_importer = rate_importer()
 
     def new_id(self):
 
@@ -210,7 +213,7 @@ class data():
         #Return the new id
         return next_id
 
-    def add_experiment(self):
+    def add_experiment(self,experiment):
 
         """
         Creates a new experiment object
@@ -222,33 +225,13 @@ class data():
         #Pick an id for the new experiment
         current_id = self.new_id()
         #Create the experiment object
-        self.current_experiment = experiment(self.session,current_id)
+        self.experiments[current_id] = experiment
 
     def delete_experiment(self,experiment_id):
 
         """Removes an experiment from the experiments list"""
 
         del self.experiments[experiment_id]
-
-    def modify_experiment(self,experiment_id):
-
-        """Moves an experiment from the experiments list to the temporary store"""
-
-        #Copy the experiment into the temporary store
-        self.current_experiment = self.experiments[experiment_id]
-        #Delete the experiment from the experiments list
-        self.delete_experiment(experiment_id)
-
-    def save_experiment(self,autocomplete=False):
-
-        """Saves the current experiment into the experiments list"""
-
-        #Check the experiment object
-        self.current_experiment.check(autocomplete)
-        #Copy to the experiment list
-        self.experiments[self.current_experiment.id] = self.current_experiment
-        #Clear the temporary store
-        del self.current_experiment
 
 class experiment():
 
@@ -262,122 +245,17 @@ class experiment():
     case the data is used to estimate kinetic rate constants for the model system.
     """
 
-    def __init__(self,session,experiment_id):
+    def __init__(self,session,reactant_dictionary):
 
         """Initiates a new experiment object"""
-
-        #Make the parent session object accessible
+        self.data = reactant_dictionary
+        self.times = self.cache_times()
         self.session = session
+        self.starting_concentrations = self.cache_concentrations()
 
-        #Set the experiment id
-        self.id = experiment_id
-        #Create the data dictionary
-        self.data = self.new_data_dictionary()
-        #Create the data importer
-        self.importer = importer(self)
-        #Create a tuple of valid classes for data objects
-        self.data_classes = (initial_concentration,time_series,rate)
-        #Set the flags to an unchecked state
-        self.reset_flags()
-
-    def reset_flags(self):
-
-        """Resets various flags to ensure experiment is properly checked after changes have been made"""
-        
-        #This experiment has not been checked yet
-        self.checked = False
-        #Erase starting_concentration cache
-        self.cached_concentrations = False
-        #Erase concentration_times cache
-        self.cached_time = False
-        #Erase rate_times cache
-
-    def new_data_dictionary(self):
-
-        """Creates a new, empty data dictionary"""
-
-        #Get the list of reactants for the model
-        reactants = self.session.model.reactants
-        #Create a dictionary
-        reactant_dictionary = {}
-        #Create an empty entry in the data dictionary for each of the reactants
-        for reactant in reactants:
-            reactant_dictionary[reactant] = False
-        #Return the dictionary
-        return reactant_dictionary
-
-    def assign_reactant(self,reactant,reactant_data):
-
-        """Assigns an initial_condition, time_series or rate object to a reactant in the dictionary"""
-
-        #Check to make sure the reactant_data is valid
-        if not isinstance(reactant_data,self.data_classes):
-            raise BeakerException('Data supplied is not an initial_concentration, time_series or rate object.')
-        #Assign the data to the reactant
-        self.data[reactant] = reactant_data
-        self.reset_flags()
-
-    def set_starting_concentrations(self,concentrations):
-
-        """Accepts a list of reactant:concentration pairs and assigns them to reactants"""
-
-        for reactant in concentrations:
-            self.data[reactant] = initial_concentration(concentrations[reactant])
-
-    def check(self,autocomplete=False):
-
-        """Checks the reactant dictionary to ensure all reactants are assigned correctly"""
-
-        #If this experiment has been checked previously, don't check again
-        if (self.checked): return True
-
-        #If autocomplete is true, autocomplete before checking
-        if autocomplete: self.auto_complete()
-
-        #This experiment has been checked
-        self.checked = True
-
-        #Check the reactant set matches that of the model
-        if not set(self.data.keys()) == set(self.session.model.reactants):
-            raise BeakerException('Reactants are not all assigned for this reaction')
-            #Failed the check
-            self.checked = False
-            return False
-
-        #Check all reactants are set correctly
-        for reactant in self.data:
-            if not self.data[reactant]:
-                print self.data[reactant]
-                raise BeakerException('Assigned data is not an initial_concentration, time_series or rate object.')
-                #Failed the check
-                self.checked = False
-                break
-
-        return self.checked
-
-    def auto_complete(self):
-
-        """Sets all unassigned reactants to an initial concentration of 0"""
-
-        #If experiment has been checked, it must be complete
-        if self.checked:
-            return True
-
-        for reactant in self.data:
-            if not self.data[reactant]:
-                self.data[reactant] = initial_concentration()
-
-    def starting_concentrations(self):
+    def cache_concentrations(self):
 
         """Returns a list of starting concentrations for passing to the modeller"""
-
-        #Make sure the experiment has passed a check
-        if not self.check():
-            return False
-
-        #Check for a cached version
-        if self.cached_concentrations:
-            return self.cached_concentrations
 
         #Create an empty list to store the concentrations
         starting_concentrations = list()
@@ -389,17 +267,9 @@ class experiment():
         #return the starting concentration list
         return starting_concentrations
 
-    def times(self):
+    def cache_times(self):
 
         """Return a list of the time points present in the experimental data"""
-
-        #Make sure the experiment has passed a check
-        if not self.check():
-            return False
-
-        #Check for a cached version
-        if self.cached_time:
-            return self.cached_time
 
         #Create an empty set to store the time points
         time_points = set()
@@ -416,11 +286,8 @@ class experiment():
         time_list = list(time_points)
         time_list.sort()
 
-        #Cache the time points
-        self.cached_time = time_list
-
         #Return the time points
-        return self.cached_time
+        return time_list
 
 class time_series():
 
@@ -446,11 +313,15 @@ class time_series():
         self.concentrations = concentrations
         self.starting_concentration = starting_concentration
 
+class rate_series():
+
+    pass
+
 class rate():
 
     """Stores a reaction rate"""
 
-    def __init__(self,rate,time,starting_concentration):
+    def __init__(self,rate,time=0.0,starting_concentration=0.0):
 
         """Initiates a new rate object"""
 
@@ -469,21 +340,27 @@ class initial_concentration():
 
         #Create the variable
         self.starting_concentration = starting_concentration
-    
+
 class importer():
 
     """Handles the extraction of data from flat text files"""
     
-    def __init__(self,experiment):
+    def __init__(self,data):
 
         """Initiates a new importer object"""
 
-        #Make the parent experiment available
-        self.experiment = experiment
-        #Create the variable
+        #Make the session's data object available
+        self.session = data.session
+        #Create the reactant dictionary
+        self.reactants = self.new_data_dictionary()
+        #Create a tuple of valid classes for data objects
+        self.data_classes = self.allowed_classes()
+        #Set the flags to an unchecked state
+        self.reset_flags()
+
         self.dictionary = False
 
-    def text_to_dictionary(self,text_file,delimiter='\t'):
+    def import_text(self,text_file,delimiter='\t'):
 
         """Converts a text file to a dictionary object"""
 
@@ -503,29 +380,136 @@ class importer():
                 data_dictionary[key].append(float(row[key]))
 
         #Return the dictionary
-        return data_dictionary
+        self.dictionary = data_dictionary
 
-    def import_time_series(self,text_file,delimiter='\t',time_key='T'):
+    def new_data_dictionary(self):
 
-        """Converts a text file to a dictionary of time_series objects"""
+        """Creates a new, empty data dictionary"""
 
-        #Create the initial dictionary
-        temp_dictionary = self.text_to_dictionary(text_file,delimiter=delimiter)
+        #Get the list of reactants for the model
+        reactants = self.session.model.reactants
+        #Create a dictionary
+        reactant_dictionary = {}
+        #Create an empty entry in the data dictionary for each of the reactants
+        for reactant in reactants:
+            reactant_dictionary[reactant] = False
+        #Return the dictionary
+        return reactant_dictionary
 
-        #Create the storage dictionary
-        self.dictionary = {}
+    def reset_flags(self):
+
+        """Resets various flags to ensure data is properly checked after changes have been made"""
+        
+        #This experiment has not been checked yet
+        self.checked = False
+        
+    def set_starting_concentrations(self,concentrations):
+
+        """Accepts a dictionary of reactant:concentration pairs and assigns them to reactants"""
+
+        for reactant in concentrations:
+            self.reactants[reactant] = initial_concentration(concentrations[reactant])
+
+    def check(self,autocomplete=False):
+
+        """Checks the reactant dictionary to ensure all reactants are assigned correctly"""
+
+        #If the data has been checked previously, don't check again
+        if (self.checked): return True
+
+        #If autocomplete is true, autocomplete before checking
+        if autocomplete: self.auto_complete()
+
+        #This experiment has been checked
+        self.checked = True
+
+        #Check the reactant set matches that of the model
+        if not set(self.reactants.keys()) == set(self.session.model.reactants):
+            raise BeakerException('Reactants are not all assigned for this reaction')
+            #Failed the check
+            self.checked = False
+            return False
+
+        #Check all reactants are set correctly
+        for reactant in self.reactants:
+            if not (self.reactants[reactant] and isinstance(self.reactants[reactant],self.data_classes)):
+                raise BeakerException('Assigned data is not an initial_concentration, time_series or rate object.')
+                #Failed the check
+                self.checked = False
+                break
+
+            if self.reactants[reactant].starting_concentration is False:
+                raise BeakerException('No initial concentration assigned')
+                #Failed the check
+                self.checked = False
+                break           
+
+        return self.checked
+
+    def auto_complete(self):
+
+        """Sets all unassigned reactants to an initial concentration of 0"""
+
+        #If experiment has been checked, it must be complete
+        if self.checked:
+            return True
+        
+        for reactant in self.reactants:
+            if not self.reactants[reactant]:
+                self.reactants[reactant] = initial_concentration()
+            if isinstance(self.reactants[reactant],rate_series) and not self.reactants[reactant].starting_concentration:
+                self.reactants[reactant].starting_concentration = 0.0
+    
+    
+class concentration_importer(importer):
+
+    """Handles the extraction of concentration data from flat text files"""
+
+    def allowed_classes(self):
+
+        """Return a tuple of allowed classes"""
+        
+        return (initial_concentration,time_series)
+
+    def assign(self,dictionary):
+
+        """Takes a dictionary of model_key : dictionary_key pairs and performs assignments"""
+
+        if not 'time' in dictionary.keys():
+            raise BeakerExeption('No time key specified')
+
+        self.assign_time(dictionary['time'])
+
+        for key in dictionary:
+            if key != 'time':
+                self.reactants[key] = self.dictionary[dictionary[key]]
+
+    def assign_time(self,time_key='T'):
+
+        """Converts a dictionary of lists to time_series objects"""
 
         #Convert lists to time series
-        for key in temp_dictionary:
+        for key in self.dictionary:
             if not key == time_key:
-                self.dictionary[key] = time_series(temp_dictionary[time_key],temp_dictionary[key])
+                self.dictionary[key] = time_series(self.dictionary[time_key],self.dictionary[key])
 
-    def assign(self,dictionary_key,model_key):
+    def assign_concentration(self,dictionary_key,model_key):
 
         """Assigns imported data to the experiment"""
 
         #Assign the data
-        self.experiment.assign_reactant(model_key,self.dictionary[dictionary_key])
+        self.reactants[model_key] = self.dictionary[dictionary_key]
+
+    def save(self,autocomplete=False):
+
+        """Saves the entered data"""
+
+        #Check the data
+        self.check(autocomplete)
+
+        new_experiment = experiment(self.session,self.reactants)
+
+        self.session.data.add_experiment(new_experiment)
                 
     
 class model_solver():
@@ -576,10 +560,10 @@ class model_solver():
             experiment = self.session.data.experiments[id]
 
             #Get the starting concentrations    
-            starting_concentrations = experiment.starting_concentrations()
+            starting_concentrations = experiment.starting_concentrations
 
             #Run the model for the time points in the experimental data
-            modelled_data = self.session.model.run(experiment.times(),starting_concentrations,parameters)
+            modelled_data = self.session.model.run(experiment.times,starting_concentrations,parameters)
 
             #Calculate the difference between model and data for each reactant
             for reactant in self.session.model.reactants:
