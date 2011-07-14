@@ -1,6 +1,6 @@
 """BEAKER is an open source program designed for modelling enzymatic reactions."""
 
-import os, logging, cPickle, kinpy, sys, csv, numpy as np
+import os, logging, cPickle, kinpy, sys, random, csv, numpy as np
 from scipy import optimize
 
 class session():
@@ -200,7 +200,7 @@ class data():
         self.id_counter = 0
         #Initiate the importers
         self.concentration_importer = concentration_importer(self)
-        #self.rate_importer = rate_importer()
+        self.rate_importer = rate_importer(self)
 
     def new_id(self):
 
@@ -315,7 +315,45 @@ class time_series():
 
 class rate_series():
 
-    pass
+    """Stores a series of reaction rates"""
+
+    def __init__(self,time=0.0):
+
+        """Initiates a new object"""
+
+        #Create the variables
+        self.rates = False
+        self.time = time
+        self.concentrations = False
+        self.starting_concentration = False
+
+    def set_rates(self,rate_data):
+
+        """Assigns rate_data to the object"""
+
+        self.rates = rate_data
+
+    def set_concentrations(self,conc_data):
+
+        """Assigns conc_data to the object"""
+
+        self.concentrations = conc_data
+        self.starting_concentration = True
+
+    def get(self,i):
+
+        if self.starting_concentration is False:
+            raise BeakerExeption('Starting Concentration not yet set')
+        if not self.rates:
+            if not self.concentrations:
+                return initial_concentration(self.starting_concentration)
+            else:
+                return initial_concentration(self.concentrations[i])
+        else:
+            if not self.concentrations:
+                return rate(self.rates[i],self.time,self.starting_concentration)
+            else:
+                return rate(self.rates[i],self.time,self.concentrations[i])
 
 class rate():
 
@@ -327,8 +365,11 @@ class rate():
 
         #Create the variables
         self.rate = rate
+        if time == 0.0:
+            time = 1.0
         self.time = time
         self.starting_concentration = starting_concentration
+            
 
 class initial_concentration():
 
@@ -402,6 +443,8 @@ class importer():
         
         #This experiment has not been checked yet
         self.checked = False
+        #This experiment has not had data added yet
+        self.length = False
         
     def set_starting_concentrations(self,concentrations):
 
@@ -510,6 +553,88 @@ class concentration_importer(importer):
         new_experiment = experiment(self.session,self.reactants)
 
         self.session.data.add_experiment(new_experiment)
+
+class rate_importer(importer):
+
+    """Handles the extraction of concentration data from flat text files"""
+
+    def allowed_classes(self):
+
+        """Return a tuple of allowed classes"""
+        
+        return (initial_concentration,rate_series)
+
+    def assign_rates(self,assignments):
+
+        """Assign a dictionary of model_key:dictionary_key pairs"""
+
+        for model_key in assignments:
+            self.assign_rate(model_key,assignments[model_key])
+
+    def assign_rate(self,model_key,dictionary_key):
+
+        """Assigns a lists to the reactant dictionary as a rate_series objects"""
+
+        #Check length
+        self.check_length(dictionary_key)
+
+        #Check the dictionary
+        if not isinstance(self.reactants[model_key],rate_series):
+            self.reactants[model_key] = rate_series()
+            
+        #Assign the data
+        self.reactants[model_key].set_rates(self.dictionary[dictionary_key])
+
+    def assign_concentrations(self,assignments):
+
+        """Assign a dictionary of model_key:dictionary_key pairs"""
+
+        for model_key in assignments:
+            self.assign_concentration(model_key,assignments[model_key])
+
+    def assign_concentration(self,model_key,dictionary_key):
+
+        """Assigns imported data to the experiment"""
+
+        #Check length
+        self.check_length(dictionary_key)
+
+        #Check the dictionary
+        if not isinstance(self.reactants[model_key],rate_series):
+            self.reactants[model_key] = rate_series()
+            
+        #Assign the data
+        self.reactants[model_key].set_concentrations(self.dictionary[dictionary_key])
+
+    def check_length(self,dictionary_key):
+
+        """Checks the length of data to import"""
+
+        #Check if data has been imported before
+        if not self.length:
+            self.length = len(self.dictionary[dictionary_key])
+
+        if not self.length == len(self.dictionary[dictionary_key]):
+            raise BeakerException('Data length does not match')
+        
+    def save(self,autocomplete=False):
+
+        """Saves the entered data"""
+
+        #Check the data
+        self.check(autocomplete)
+
+        #Loop over data to create experiments
+        for i in range(self.length):
+            temp_dictionary = self.new_data_dictionary()
+            for reactant in self.reactants:
+                if isinstance(self.reactants[reactant],initial_concentration):
+                    temp_dictionary[reactant] = self.reactants[reactant]
+                else:
+                    temp_dictionary[reactant] = self.reactants[reactant].get(i)
+                    
+            self.session.data.add_experiment(experiment(self.session,temp_dictionary))
+                
                 
     
 class model_solver():
@@ -535,6 +660,10 @@ class model_solver():
             initial_guess = []
             for i in range(len(self.session.model.kinpy_model.debug_k)):
                 initial_guess.append(1.0)
+    
+        #Check to see if a random guess is required
+        elif initial_guess == 'random':
+            initial_guess = self.random_guess()
 
         #Check to ensure the initial_guess is of the correct length
         if not len(initial_guess) == len(self.session.model.kinpy_model.debug_k):
@@ -562,8 +691,15 @@ class model_solver():
             #Get the starting concentrations    
             starting_concentrations = experiment.starting_concentrations
 
+            #Get the times    
+            times = experiment.times
+
+            #Check the times include 0 and 1
+            if not 0.0 in times:
+                times.insert(0,0.0)
+
             #Run the model for the time points in the experimental data
-            modelled_data = self.session.model.run(experiment.times,starting_concentrations,parameters)
+            modelled_data = self.session.model.run(times,starting_concentrations,parameters)
 
             #Calculate the difference between model and data for each reactant
             for reactant in self.session.model.reactants:
@@ -579,7 +715,7 @@ class model_solver():
                 elif isinstance(experiment.data[reactant],rate):
                     expected = self.subset_rate(modelled_data[reactant],observed)
                     #Calculate the suqare difference and add it to the running total
-                    total += expected.sq_diff(observed)
+                    total += self.point_square_difference(observed.rate,expected)
 
         #Return the total squared difference
         return total
@@ -616,10 +752,26 @@ class model_solver():
 
         """Return only the expected rate calculated for time of the observed rate"""
 
+        #If the time is 0, return the rate for 1
+
+        if not observed.time:
+            observed.time = 1.0
+
         return expected['rate'][expected['time'].index(observed.time)]
 
-        
-        
+    def random_guess(self):
+
+        """Return a random initial guess"""
+
+        initial_guess = []
+        for i in range(len(self.session.model.kinpy_model.debug_k)):
+            integer = random.randint(0,9)
+            float = random.random()
+            exponent = random.randint(0,5) - 3
+            
+            initial_guess.append((integer+float)*10**exponent)
+
+        return initial_guess
 
 class BeakerException(Exception):
     pass
