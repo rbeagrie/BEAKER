@@ -2,6 +2,7 @@
 
 import os, logging, cPickle, kinpy, sys, random, csv, numpy as np
 from scipy import optimize
+from types import *
 
 class session():
 
@@ -14,7 +15,13 @@ class session():
 
     def __init__(self,name,debug='WARNING',directory=False,project_file=False):
 
-        """Initiates a new BEAKER session"""
+        """Initiate a new BEAKER session"""
+
+        #Check the variables
+        assert type(name) is StringType, 'Invalid project name "%s": project name must be a string' % name
+        assert debug in set('WARNING','DEBUG','INFO'), 'Invalid debugging level "%s": valid levels are "WARNING", "INFO" AND "DEBUG"' % debug
+        assert type(directory) is StringType, 'Invalid directory name "%s": directory name must be a string' % directory
+        assert type(project_file) is StringType, 'Invalid project file name "%s": project file name must be a string' % project_file
 
         #Set the project name
         self.name = name
@@ -36,6 +43,8 @@ class session():
             format='%(asctime)s %(levelname)s: %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S')
 
+        logging.info('Starting a new BEAKER session')
+
         #Create a model_solver object and attach it to the session
         self.solver = model_solver(self)
 
@@ -46,7 +55,9 @@ class session():
 
     def initiate_model(self,model_file):
 
-        """Initiates a new BEAKER model"""
+        """Initiate a new BEAKER model"""
+        
+        assert type(model_file) is StringType, 'Invalid model file path "%s": model file path must be a string' % model_file
 
         #Create a new model from the model file and attach it to the session
         logging.info('Creating a new model')
@@ -54,7 +65,7 @@ class session():
 
     def initiate_data(self):
 
-        """Initiates a new BEAKER data object"""
+        """Initiate a new BEAKER data object"""
 
         #Create an empty data object and attach it to the session
         logging.info('Creating a new data object')
@@ -62,11 +73,11 @@ class session():
 
     def save(self):
 
-        """Saves the current BEAKER session"""
+        """Save the current BEAKER session"""
 
         #Save the session object to a file by pickling it
-        logging.info('Saving all data')
         save_file = os.path.join(self.directory,self.name,'.bkr')
+        logging.info('Saving all data to %s' % save_file)
         f = open(save_file, 'w')
         cPickle.dump(self,f)
         f.close()
@@ -76,43 +87,48 @@ class model():
     """
     Class to hold the reaction model
 
-    This class holds the set of differential equations and variables (or 'model')
-    which we use to simulate a chemical reaction in silico. It contains fuctions
+    This class holds a set of differential equations and variables 
+    used to simulate a chemical reaction in silico. It contains fuctions
     to generate this model using an input file and the kinpy script (a source
     code generator provided by Akshay Srinivasan).
     """
 
     def __init__(self,session,input_file):
 
-        """Initiates a new model object"""
+        """Initiate a new model object"""
+
+        assert type(input_file) is StringType, 'Invalid input file path "%s": inpu file path must be a string' % input_file
 
         #Make the parent session object accessible
         self.session = session
 
         #Run a function to parse the input file
+        logging.info('Parsing model input file: %s' % input_file)
         self.parse_input_file(input_file)
 
-    def parse_input_file(self,input_file):
+    def __parse_input_file(self,input_file):
 
         """Checks the type of model file supplied and handles it appropriately"""
 
         #Check that the model file exists
         if not os.path.exists(input_file):
-            raise BeakerException('Model file does not exist')
+            raise BeakerException('Model file "%s" does not exist' % input_file)
         
         #Check the extension of the model file
         root,ext = os.path.splitext(input_file)
         if ext == '.k':
             #Input is a kinpy file, so run kinpy
+            logging.info('Model file is a kinpy input file. Passing it to kinpy.')
             self.run_kinpy(input_file)
         elif ext == '.py':
             #Input is kinpy generated code, so import it
+            logging.info('Model file is a python file. Importing it.')
             self.import_kinpy(input_file)
         else:
             #Could not determine file type
-            raise BeakerException('Could not determine the input file type')
+            raise BeakerException('Could not determine the file type of "%s"' % input_file)
 
-    def run_kinpy(self,model_file):
+    def __run_kinpy(self,model_file):
 
         """Passes a kinpy file to kinpy, then imports the resulting source code"""
 
@@ -120,12 +136,15 @@ class model():
         output_file = os.path.join(self.session.directory,'kinpy_code.py')
         #Run kinpy
         kinpy.generate(model_file,output_file)
+        logging.info('Kinpy output file "%s" written.' % output_file)
         #Import the kinpy code
         self.import_kinpy(output_file)
 
-    def import_kinpy(self,code_file):
+    def __import_kinpy(self,code_file):
 
         """Imports the generated kinpy code as a new module"""
+
+        logging.info('Importing kinpy code from "%s".' % path)
 
         #Get the path of the parent directory
         path, filename = os.path.split(code_file)
@@ -137,7 +156,7 @@ class model():
         try:
             kinpy_code = __import__(filename)
         except:
-            raise BeakerException('Not a valid kinpy code file')
+            raise BeakerException('"%s" is not a valid kinpy code file.' % path)
         #Make sure module is most recent version
         reload(kinpy_code)
         #Remove parent directory from PYTHONPATH
@@ -147,13 +166,24 @@ class model():
         #Make a shortcut to the reactants set
         self.reactants = self.kinpy_model.reactants
 
+        logging.info('Successfully imported kinpy code from "%s".' % path)
+
     def run(self,times,starting_concentrations,parameters):
 
         """Run the model and return concentrations and rates of change for all reactants"""
 
+        assert type(times[0]) is FloatType, 'Times must be a subscriptable object containing floats.'
+        assert type(starting_concentrations[0]) is FloatType, 'Starting Concentrations must be a subscriptable object containing floats.'
+        assert type(parameters[0]) is FloatType, 'Parameters must be a subscriptable object containing floats.'
+        
+
         #Create a dictionary to hold the results
         run_results = {}
         #Get concentrations for all reactants and time points
+        logging.info('Running model to determine reactant concentrations and rates')
+        logging.debug('Model parameters: %s' % parameters)
+        logging.debug('Modelling time points: %s' % times)
+        logging.debug('Reactant initial concentrations: %s' % starting_concentrations)
         concentrations = self.kinpy_model.run(starting_concentrations,times,parameters)
         #Get rates for all reactants and time points
         rates = self.get_rates(concentrations,parameters)
@@ -168,7 +198,7 @@ class model():
         #Return the dictionary
         return run_results
 
-    def get_rates(self,concentrations,parameters):
+    def __get_rates(self,concentrations,parameters):
 
         """Run the model, returning rates of change for all reactants"""
 
@@ -202,7 +232,7 @@ class data():
         self.concentration_importer = concentration_importer(self)
         self.rate_importer = rate_importer(self)
 
-    def new_id(self):
+    def __new_id(self):
 
         """Returns the next unique id and increments the id variable"""
 
@@ -211,27 +241,34 @@ class data():
         #Increment the counter
         self.id_counter += 1
         #Return the new id
+        logging.debug('Next experiment id is %s' % next_id)
         return next_id
 
     def add_experiment(self,experiment):
 
         """
-        Creates a new experiment object
+        Add an experiment object to the experiments list
 
-        A new experiment object is created and stored temporarily in the current_experiment variable.
-        The experiment is not added to the experiments list until the save() function is called.
+        An experiment object is added to the experiments list and given a unique id.
         """
 
+        assert isinstance(experiment,beaker.experiment), 'Experiment "%s" is not a valid BEAKER experiment object' % experiment
+        
         #Pick an id for the new experiment
         current_id = self.new_id()
         #Create the experiment object
         self.experiments[current_id] = experiment
+        self.experiments[current_id].id = current_id
+
+        logging.info('Experiment #%s added to experiments list' % current_id)
 
     def delete_experiment(self,experiment_id):
 
         """Removes an experiment from the experiments list"""
 
         del self.experiments[experiment_id]
+
+        logging.info('Experiment #%s deleted from experiments list' % experiment_id)
 
 class experiment():
 
@@ -245,17 +282,26 @@ class experiment():
     case the data is used to estimate kinetic rate constants for the model system.
     """
 
-    def __init__(self,session,reactant_dictionary):
+    def __init__(self,session,reactant_dictionary,expt_id=False):
 
-        """Initiates a new experiment object"""
+        """Initiate a new experiment object"""
+
+        assert type(reactant_dictionary) is DictType, 'Reactant dictionary must be a dictionary'
+        assert set(reactant_dictionary.keys()) == set(session.model.reactants.keys()), 'Keys of reaction dictionary must exactly match those of the model'
+
+        logging.info('Creating new experiment object')
+        
         self.data = reactant_dictionary
         self.times = self.cache_times()
         self.session = session
         self.starting_concentrations = self.cache_concentrations()
+        self.id = expt_id
 
-    def cache_concentrations(self):
+    def __cache_concentrations(self):
 
         """Returns a list of starting concentrations for passing to the modeller"""
+
+        logging.debug('Setting starting concentrations for experiment')
 
         #Create an empty list to store the concentrations
         starting_concentrations = list()
@@ -263,13 +309,17 @@ class experiment():
         #Add each starting concentration in the order specified by the model
         for reactant in self.session.model.reactants:
             starting_concentrations.append(self.data[reactant].starting_concentration)
+
+        logging.debug('Experiment #%s starting concentrations are' % starting_concentrations)
         
         #return the starting concentration list
         return starting_concentrations
 
-    def cache_times(self):
+    def __cache_times(self):
 
         """Return a list of the time points present in the experimental data"""
+
+        logging.debug('Setting time points for experiment')
 
         #Create an empty set to store the time points
         time_points = set()
@@ -286,16 +336,29 @@ class experiment():
         time_list = list(time_points)
         time_list.sort()
 
+        logging.debug('Experiment #%s time points are' % time_list)
+
         #Return the time points
         return time_list
 
 class time_series():
 
-    """Stores a series of concentration measurements over time"""
+    """
+    Class to store reactant concentration measurements
+
+    This class stores a list of reactant concentration measurements as well as a list
+    of time points at which they were collected. It can also store an initial concentration
+    of the reactant (i.e. that amount which is known to have been present at t=0."""
 
     def __init__(self,times,concentrations,starting_concentration=False):
 
         """Initiates a new time_course object"""
+
+        logging.info('Creating new time_series object')
+
+        assert type(times[0]) is FloatType, 'Times must be a subscriptable object containing floats.'
+        assert type(concentrations[0]) is FloatType, 'Concentrations must be a subscriptable object containing floats.'
+        assert type(starting_concentration) is FloatType, 'Starting concentration must be a float'
 
         #Check that a starting concentration was provided
         if not starting_concentration:
@@ -321,6 +384,10 @@ class rate_series():
 
         """Initiates a new object"""
 
+        logging.info('Creating a new rate_series object')
+
+        assert type(time) is FloatType, '%s is an invalid time. Time must be a float.' % time
+
         #Create the variables
         self.rates = False
         self.time = time
@@ -329,30 +396,51 @@ class rate_series():
 
     def set_rates(self,rate_data):
 
-        """Assigns rate_data to the object"""
+        """Assign rate_data to the rate series as a set of measured rates"""
+
+        logging.info('Assigning a set of rate measurements')
+
+        assert type(rate_data[0]) is FloatType, '%s is invalid. Rate Data must be a subscriptable object containing floats.' % rate_data[0]
 
         self.rates = rate_data
 
     def set_concentrations(self,conc_data):
 
-        """Assigns conc_data to the object"""
+        """Assign conc_data to the rate series as a set of starting concentrations"""
+
+        logging.info('Assigning a set of starting concentrations')
+
+        assert type(conc_data[0]) is FloatType, '%s is invalid. Concentration Data must be a subscriptable object containing floats.' % conc_data[0]
 
         self.concentrations = conc_data
         self.starting_concentration = True
 
     def get(self,i):
 
+        """Return an experiment object for the i-th measured rate"""
+
+        assert type(i) is IntegerType
+
+        logging.debug('Returning object for measurement %s of the current rate series' % i)
+        
+        #Check that a starting concentration has been set
         if self.starting_concentration is False:
             raise BeakerExeption('Starting Concentration not yet set')
+
+        #Choose the appropriate object to return depending on what experimental data has been set
         if not self.rates:
             if not self.concentrations:
+                logging.debug('Measurement %s is a concentration (%s)', % i,self.starting_concentration)
                 return initial_concentration(self.starting_concentration)
             else:
+                logging.debug('Measurement %s is a concentration (%s)', % i,self.concentrations[i])
                 return initial_concentration(self.concentrations[i])
         else:
             if not self.concentrations:
+                logging.debug('Measurement %s is a rate (%s). Starting concentration was %s', % i,self.rates[i],self.starting_concentration)
                 return rate(self.rates[i],self.time,self.starting_concentration)
             else:
+                logging.debug('Measurement %s is a rate (%s). Starting concentration was %s', % i,self.rates[i],self.concentrations[i])
                 return rate(self.rates[i],self.time,self.concentrations[i])
 
 class rate():
