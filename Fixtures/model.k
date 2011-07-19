@@ -4,13 +4,13 @@ Sx + X <-> SxX
 SxX <-> Px + X
 
 Sy + Y <-> SyY
-SyY <-> Py + Y 
+5*SyY <-> Py + Y 
 
 Yi + Px <-> Yia
 Yia + Px <-> Y
 
-Xi + Py <-> Xia
+Xi + 2*Py <-> Xia
 Xia + Py <-> X
 
-Px <-> Sx
+Px <-> 3*Sx
 Py <-> Sy

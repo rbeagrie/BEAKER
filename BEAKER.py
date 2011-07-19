@@ -19,9 +19,9 @@ class session():
 
         #Check the variables
         assert type(name) is StringType, 'Invalid project name "%s": project name must be a string' % name
-        assert debug in set('WARNING','DEBUG','INFO'), 'Invalid debugging level "%s": valid levels are "WARNING", "INFO" AND "DEBUG"' % debug
-        assert type(directory) is StringType, 'Invalid directory name "%s": directory name must be a string' % directory
-        assert type(project_file) is StringType, 'Invalid project file name "%s": project file name must be a string' % project_file
+        assert debug in set(['WARNING','DEBUG','INFO']), 'Invalid debugging level "%s": valid levels are "WARNING", "INFO" AND "DEBUG"' % debug
+        assert directory is False or type(directory) is StringType, 'Invalid directory name "%s": directory name must be a string' % directory
+        assert project_file is False or type(project_file) is StringType, 'Invalid project file name "%s": project file name must be a string' % project_file
 
         #Set the project name
         self.name = name
@@ -104,7 +104,7 @@ class model():
 
         #Run a function to parse the input file
         logging.info('Parsing model input file: %s' % input_file)
-        self.parse_input_file(input_file)
+        self.__parse_input_file(input_file)
 
     def __parse_input_file(self,input_file):
 
@@ -119,11 +119,11 @@ class model():
         if ext == '.k':
             #Input is a kinpy file, so run kinpy
             logging.info('Model file is a kinpy input file. Passing it to kinpy.')
-            self.run_kinpy(input_file)
+            self.__run_kinpy(input_file)
         elif ext == '.py':
             #Input is kinpy generated code, so import it
             logging.info('Model file is a python file. Importing it.')
-            self.import_kinpy(input_file)
+            self.__import_kinpy(input_file)
         else:
             #Could not determine file type
             raise BeakerException('Could not determine the file type of "%s"' % input_file)
@@ -138,13 +138,13 @@ class model():
         kinpy.generate(model_file,output_file)
         logging.info('Kinpy output file "%s" written.' % output_file)
         #Import the kinpy code
-        self.import_kinpy(output_file)
+        self.__import_kinpy(output_file)
 
     def __import_kinpy(self,code_file):
 
         """Imports the generated kinpy code as a new module"""
 
-        logging.info('Importing kinpy code from "%s".' % path)
+        logging.info('Importing kinpy code from "%s".' % code_file)
 
         #Get the path of the parent directory
         path, filename = os.path.split(code_file)
@@ -174,7 +174,6 @@ class model():
 
         assert type(times[0]) is FloatType, 'Times must be a subscriptable object containing floats.'
         assert type(starting_concentrations[0]) is FloatType, 'Starting Concentrations must be a subscriptable object containing floats.'
-        assert type(parameters[0]) is FloatType, 'Parameters must be a subscriptable object containing floats.'
         
 
         #Create a dictionary to hold the results
@@ -186,7 +185,7 @@ class model():
         logging.debug('Reactant initial concentrations: %s' % starting_concentrations)
         concentrations = self.kinpy_model.run(starting_concentrations,times,parameters)
         #Get rates for all reactants and time points
-        rates = self.get_rates(concentrations,parameters)
+        rates = self.__get_rates(concentrations,parameters)
         concentrations = concentrations.transpose()
         rates = rates.transpose()
         #Assemble results into a dictionary
@@ -244,7 +243,7 @@ class data():
         logging.debug('Next experiment id is %s' % next_id)
         return next_id
 
-    def add_experiment(self,experiment):
+    def add_experiment(self,new_experiment):
 
         """
         Add an experiment object to the experiments list
@@ -252,13 +251,12 @@ class data():
         An experiment object is added to the experiments list and given a unique id.
         """
 
-        assert isinstance(experiment,beaker.experiment), 'Experiment "%s" is not a valid BEAKER experiment object' % experiment
+        assert isinstance(new_experiment,experiment), 'Experiment "%s" is not a valid BEAKER experiment object' % experiment
         
         #Pick an id for the new experiment
-        current_id = self.new_id()
+        current_id = self.__new_id()
         #Create the experiment object
-        self.experiments[current_id] = experiment
-        self.experiments[current_id].id = current_id
+        self.experiments[current_id] = new_experiment
 
         logging.info('Experiment #%s added to experiments list' % current_id)
 
@@ -282,20 +280,19 @@ class experiment():
     case the data is used to estimate kinetic rate constants for the model system.
     """
 
-    def __init__(self,session,reactant_dictionary,expt_id=False):
+    def __init__(self,session,reactant_dictionary):
 
         """Initiate a new experiment object"""
 
         assert type(reactant_dictionary) is DictType, 'Reactant dictionary must be a dictionary'
-        assert set(reactant_dictionary.keys()) == set(session.model.reactants.keys()), 'Keys of reaction dictionary must exactly match those of the model'
+        assert set(reactant_dictionary.keys()) == set(session.model.reactants), 'Keys of reaction dictionary must exactly match those of the model'
 
         logging.info('Creating new experiment object')
         
         self.data = reactant_dictionary
-        self.times = self.cache_times()
+        self.times = self.__cache_times()
         self.session = session
-        self.starting_concentrations = self.cache_concentrations()
-        self.id = expt_id
+        self.starting_concentrations = self.__cache_concentrations()
 
     def __cache_concentrations(self):
 
@@ -357,8 +354,6 @@ class time_series():
         logging.info('Creating new time_series object')
 
         assert type(times[0]) is FloatType, 'Times must be a subscriptable object containing floats.'
-        assert type(concentrations[0]) is FloatType, 'Concentrations must be a subscriptable object containing floats.'
-        assert type(starting_concentration) is FloatType, 'Starting concentration must be a float'
 
         #Check that a starting concentration was provided
         if not starting_concentration:
@@ -419,7 +414,7 @@ class rate_series():
 
         """Return an experiment object for the i-th measured rate"""
 
-        assert type(i) is IntegerType
+        assert type(i) is IntType, 'Could not retrieve experiment "%s" - i must be an integer.'
 
         logging.debug('Returning object for measurement %s of the current rate series' % i)
         
@@ -430,17 +425,17 @@ class rate_series():
         #Choose the appropriate object to return depending on what experimental data has been set
         if not self.rates:
             if not self.concentrations:
-                logging.debug('Measurement %s is a concentration (%s)', % i,self.starting_concentration)
+                logging.debug('Measurement %s is a concentration (%s)' % (i,self.starting_concentration))
                 return initial_concentration(self.starting_concentration)
             else:
-                logging.debug('Measurement %s is a concentration (%s)', % i,self.concentrations[i])
+                logging.debug('Measurement %s is a concentration (%s)' % (i,self.concentrations[i]))
                 return initial_concentration(self.concentrations[i])
         else:
             if not self.concentrations:
-                logging.debug('Measurement %s is a rate (%s). Starting concentration was %s', % i,self.rates[i],self.starting_concentration)
+                logging.debug('Measurement %s is a rate (%s). Starting concentration was %s' % (i,self.rates[i],self.starting_concentration))
                 return rate(self.rates[i],self.time,self.starting_concentration)
             else:
-                logging.debug('Measurement %s is a rate (%s). Starting concentration was %s', % i,self.rates[i],self.concentrations[i])
+                logging.debug('Measurement %s is a rate (%s). Starting concentration was %s' % (i,self.rates[i],self.concentrations[i]))
                 return rate(self.rates[i],self.time,self.concentrations[i])
 
 class rate():
@@ -449,34 +444,48 @@ class rate():
 
     def __init__(self,rate,time=0.0,starting_concentration=0.0):
 
-        """Initiates a new rate object"""
+        """Initiate a new rate object"""
+
+        logging.info('Creating a new rate object')
+
+        assert type(rate) is FloatType, '"%s" is not a valid rate. Rate must be a float.'
+        assert type(time) is FloatType, '"%s" is not a valid time. Time must be a float.'
+        assert type(starting_concentration) is FloatType, '"%s" is not a valid concentration. Concentration must be a float.'
 
         #Create the variables
         self.rate = rate
+        
+        #At time 0 there is no ES complex so rate of P formation is 0.
+        #If the initial rate is required, give the system a second to reach steady state.
         if time == 0.0:
             time = 1.0
         self.time = time
+        
         self.starting_concentration = starting_concentration
             
 
 class initial_concentration():
 
-    """Stores an initial concentration"""
+    """Store an initial concentration"""
 
     def __init__(self,starting_concentration=0.0):
 
         """Initiates a new initial_concentration object"""
+
+        logging.info('Creating a new initial_concentration object')
+        
+        assert type(starting_concentration) is FloatType, '"%s" is not a valid concentration. Concentration must be a float."' % starting_concentration
 
         #Create the variable
         self.starting_concentration = starting_concentration
 
 class importer():
 
-    """Handles the extraction of data from flat text files"""
+    """Base class containing methods common to concentration_importer and rate_importer"""
     
     def __init__(self,data):
 
-        """Initiates a new importer object"""
+        """Initiate a new importer object"""
 
         #Make the session's data object available
         self.session = data.session
@@ -485,21 +494,31 @@ class importer():
         #Create a tuple of valid classes for data objects
         self.data_classes = self.allowed_classes()
         #Set the flags to an unchecked state
-        self.reset_flags()
+        self.__reset_flags()
 
         self.dictionary = False
 
     def import_text(self,text_file,delimiter='\t'):
 
-        """Converts a text file to a dictionary object"""
+        """Convert text_file to a dictionary object"""
+
+        logging.info('Importing data from %s' % text_file)
+
+        assert type(text_file) is StringType, '"%s" is not a valid file name. File name must be a string.' % text_file
+
+        #Check that the model file exists
+        if not os.path.exists(text_file):
+            raise BeakerException('Text file "%s" does not exist' % text_file)
 
         #Open the text file
         text_file = open(text_file,'r')
         #Pass it to the csv reader
+        logging.info('Parsing data in %s' % text_file)
         data_object = csv.DictReader(text_file,delimiter=delimiter)
 
         #Create the dictionary object
         data_dictionary = {}
+        logging.debug('%s columns found: %s' % (len(data_object.fieldnames),data_object.fieldnames))
         for field in data_object.fieldnames:
             data_dictionary[field] = []
 
@@ -513,7 +532,7 @@ class importer():
 
     def new_data_dictionary(self):
 
-        """Creates a new, empty data dictionary"""
+        """Create a new, empty data dictionary"""
 
         #Get the list of reactants for the model
         reactants = self.session.model.reactants
@@ -525,23 +544,31 @@ class importer():
         #Return the dictionary
         return reactant_dictionary
 
-    def reset_flags(self):
+    def __reset_flags(self):
 
         """Resets various flags to ensure data is properly checked after changes have been made"""
+
+        logging.debug('Setting importer flags')
         
-        #This experiment has not been checked yet
+        #This data has not been checked yet
         self.checked = False
-        #This experiment has not had data added yet
+        #This data has not had data added yet
         self.length = False
         
     def set_starting_concentrations(self,concentrations):
 
         """Accepts a dictionary of reactant:concentration pairs and assigns them to reactants"""
 
-        for reactant in concentrations:
-            self.reactants[reactant] = initial_concentration(concentrations[reactant])
+        logging.info('Setting starting concentrations')
 
-    def check(self,autocomplete=False):
+        assert set(concentrations.keys()) <= set(self.reactants), '"%s" are not valid reactants. Dictionary keys must be reactants present in the model.' % list(set(concentrations.keys()).difference(set(self.reactants)))
+
+        for reactant in concentrations:
+            assert type(concentrations[reactant]) is FloatType, '"%s" is not a valid concentration. Concentration must be a float."' % concentrations[reactant]
+            self.reactants[reactant] = initial_concentration(concentrations[reactant])
+            logging.debug('Reactant "%s" concentration set to %s' % (reactant,concentrations[reactant]))
+
+    def __check(self,autocomplete=False):
 
         """Checks the reactant dictionary to ensure all reactants are assigned correctly"""
 
@@ -549,47 +576,57 @@ class importer():
         if (self.checked): return True
 
         #If autocomplete is true, autocomplete before checking
-        if autocomplete: self.auto_complete()
+        if autocomplete: self.__auto_complete()
+
+        logging.info('Checking the imported data.')
 
         #This experiment has been checked
         self.checked = True
 
         #Check the reactant set matches that of the model
         if not set(self.reactants.keys()) == set(self.session.model.reactants):
-            raise BeakerException('Reactants are not all assigned for this reaction')
+            raise BeakerException('Reactants are not all assigned for this reaction. "%s" are missing' % set(self.session.model.reactants).difference(self.reactants.keys()))        
             #Failed the check
+            logging.info('Failed the data check')
             self.checked = False
             return False
 
         #Check all reactants are set correctly
         for reactant in self.reactants:
             if not (self.reactants[reactant] and isinstance(self.reactants[reactant],self.data_classes)):
-                raise BeakerException('Assigned data is not an initial_concentration, time_series or rate object.')
+                raise BeakerException('"%s" at reactant "%s" is not an initial_concentration, time_series or rate object.') % self.reactants[reactant],reactant
                 #Failed the check
+                logging.info('Failed the data check')
                 self.checked = False
                 break
 
             if self.reactants[reactant].starting_concentration is False:
-                raise BeakerException('No initial concentration assigned')
+                raise BeakerException('No initial concentration assigned for reactant "%s"' % reactant)
                 #Failed the check
+                logging.info('Failed the data check')
                 self.checked = False
                 break           
 
         return self.checked
 
-    def auto_complete(self):
+    def __auto_complete(self):
 
         """Sets all unassigned reactants to an initial concentration of 0"""
 
-        #If experiment has been checked, it must be complete
+        #If data has been checked, it must be complete
         if self.checked:
             return True
-        
+
+        logging.info('Automatically setting unset reactants')
+
+        #If a reactants starting concentration is unset, give it an value of 0
         for reactant in self.reactants:
             if not self.reactants[reactant]:
                 self.reactants[reactant] = initial_concentration()
+                logging.debug('Reactant "%s" concentration automatically set to 0.0' % reactant)
             if isinstance(self.reactants[reactant],rate_series) and not self.reactants[reactant].starting_concentration:
                 self.reactants[reactant].starting_concentration = 0.0
+                logging.debug('Reactant "%s" concentration automatically set to 0.0' % reactant)
     
     
 class concentration_importer(importer):
@@ -606,40 +643,56 @@ class concentration_importer(importer):
 
         """Takes a dictionary of model_key : dictionary_key pairs and performs assignments"""
 
+        logging.info('Assigning imported concentration data to the model')
+
         if not 'time' in dictionary.keys():
             raise BeakerExeption('No time key specified')
 
-        self.assign_time(dictionary['time'])
+        assert dictionary['time'] in self.dictionary, '"%s" is not a valid key. Time key must correspond to a column heading in the data file.' % dictionary[key]
+
+        self.__assign_time(dictionary['time'])
 
         for key in dictionary:
             if key != 'time':
-                self.reactants[key] = self.dictionary[dictionary[key]]
 
-    def assign_time(self,time_key='T'):
+                assert key in self.reactants, '"%s" is not a valid reactant. Dictionary keys must be reactants defined in the model.' % key
+                assert dictionary[key] in self.dictionary, '"%s" is not a valid key. Dictionary values must correspond to column headings in the data file.' % dictionary[key]
+                
+                self.__assign_concentration(dictionary[key],key)
+
+    def __assign_time(self,time_key='T'):
 
         """Converts a dictionary of lists to time_series objects"""
+
+        logging.debug('Setting %s as the time column' % time_key)
 
         #Convert lists to time series
         for key in self.dictionary:
             if not key == time_key:
                 self.dictionary[key] = time_series(self.dictionary[time_key],self.dictionary[key])
 
-    def assign_concentration(self,dictionary_key,model_key):
+    def __assign_concentration(self,dictionary_key,model_key):
 
         """Assigns imported data to the experiment"""
 
         #Assign the data
         self.reactants[model_key] = self.dictionary[dictionary_key]
 
+        logging.debug('Column "%s" assigned to reactant "%s"' % (dictionary_key,model_key))
+
     def save(self,autocomplete=False):
 
         """Saves the entered data"""
 
-        #Check the data
-        self.check(autocomplete)
+        logging.info('Saving imported concentration data to the session')
 
+        #Check the data
+        self._importer__check(autocomplete)
+
+        #Create a new experiment from the assigned data
         new_experiment = experiment(self.session,self.reactants)
 
+        #Save the experiment to the session
         self.session.data.add_experiment(new_experiment)
 
 class rate_importer(importer):
@@ -656,36 +709,50 @@ class rate_importer(importer):
 
         """Assign a dictionary of model_key:dictionary_key pairs"""
 
+        logging.info('Assigning imported rate data to the model')
+
         for model_key in assignments:
-            self.assign_rate(model_key,assignments[model_key])
 
-    def assign_rate(self,model_key,dictionary_key):
+            assert model_key in self.reactants, '"%s" is not a valid reactant. Dictionary keys must be reactants defined in the model.' % model_key
+            assert assignments[model_key] in self.dictionary, '"%s" is not a valid key. Dictionary values must correspond to column headings in the data file.' % dictionary[model_key]
+                
+            self.__assign_rate(model_key,assignments[model_key])
 
-        """Assigns a lists to the reactant dictionary as a rate_series objects"""
+    def __assign_rate(self,model_key,dictionary_key):
+
+        """Assigns a list to the reactant dictionary as a rate_series object"""
 
         #Check length
-        self.check_length(dictionary_key)
+        self.__check_length(dictionary_key)
 
-        #Check the dictionary
+        #Check if the reactant has already been set in the dictionary
         if not isinstance(self.reactants[model_key],rate_series):
+            #If not, initialise it
             self.reactants[model_key] = rate_series()
             
         #Assign the data
         self.reactants[model_key].set_rates(self.dictionary[dictionary_key])
+        logging.debug('Column "%s" assigned to reactant "%s" as a set of rate measurements' % (dictionary_key,model_key))
 
     def assign_concentrations(self,assignments):
 
         """Assign a dictionary of model_key:dictionary_key pairs"""
 
-        for model_key in assignments:
-            self.assign_concentration(model_key,assignments[model_key])
+        logging.info('Assigning imported concentration data to the model')
 
-    def assign_concentration(self,model_key,dictionary_key):
+        for model_key in assignments:
+
+            assert model_key in self.reactants, '"%s" is not a valid reactant. Dictionary keys must be reactants defined in the model.' % model_key
+            assert assignments[model_key] in self.dictionary, '"%s" is not a valid key. Dictionary values must correspond to column headings in the data file.' % dictionary[model_key]
+            
+            self.__assign_concentration(model_key,assignments[model_key])
+
+    def __assign_concentration(self,model_key,dictionary_key):
 
         """Assigns imported data to the experiment"""
 
         #Check length
-        self.check_length(dictionary_key)
+        self.__check_length(dictionary_key)
 
         #Check the dictionary
         if not isinstance(self.reactants[model_key],rate_series):
@@ -693,8 +760,9 @@ class rate_importer(importer):
             
         #Assign the data
         self.reactants[model_key].set_concentrations(self.dictionary[dictionary_key])
+        logging.debug('Column "%s" assigned to reactant "%s" as a set of concentration measurements' % (dictionary_key,model_key))
 
-    def check_length(self,dictionary_key):
+    def __check_length(self,dictionary_key):
 
         """Checks the length of data to import"""
 
@@ -702,6 +770,7 @@ class rate_importer(importer):
         if not self.length:
             self.length = len(self.dictionary[dictionary_key])
 
+        #Check that the length of the new data matches that of the previous
         if not self.length == len(self.dictionary[dictionary_key]):
             raise BeakerException('Data length does not match')
         
@@ -709,8 +778,10 @@ class rate_importer(importer):
 
         """Saves the entered data"""
 
+        logging.info('Saving imported rate data to the session')
+
         #Check the data
-        self.check(autocomplete)
+        self._importer__check(autocomplete)
 
         #Loop over data to create experiments
         for i in range(self.length):
@@ -720,7 +791,8 @@ class rate_importer(importer):
                     temp_dictionary[reactant] = self.reactants[reactant]
                 else:
                     temp_dictionary[reactant] = self.reactants[reactant].get(i)
-                    
+
+            #Save the new experiment to the session        
             self.session.data.add_experiment(experiment(self.session,temp_dictionary))
                 
                 
@@ -742,6 +814,12 @@ class model_solver():
 
         """Fit the session data to the model and return an estimate of the model parameters"""
 
+        logging.info('Preparing to solve the model.')
+
+        assert method in self.solver.keys(), '"%s" is not a valid method for solving the model. Accepted parameters are: %s' % (method, self.solver.keys())
+
+        logging.info('Solving the model using the "%s" method' % method)
+
         #Check to see if an initial guess for the parameters was given
         if not initial_guess:
             #if not, set every parameter to 1
@@ -757,20 +835,26 @@ class model_solver():
         if not len(initial_guess) == len(self.session.model.kinpy_model.debug_k):
             raise BeakerException('Initial guess does not have the right number of elements')
 
-        #Solve the model by minimizing the least square difference between the model and the data
-        print self.solver[method](self.total_square_difference,initial_guess)
+        logging.debug('Initial guess for the model parameters is %s' % initial_guess)
 
-    def total_square_difference(self,parameters):
+        #Solve the model by minimizing the least square difference between the model and the data
+        xopt,fopt,iters,funcalls,warnflag = self.solver[method](self.__total_square_difference,initial_guess,disp=False,full_output=True)
+        print xopt,fopt,iters,funcalls,warnflag
+
+    def __total_square_difference(self,parameters):
 
         """Calculate the square difference between the model and the data"""
 
+        #Start a running total
         total = 0
 
         #Check to ensure none of the parameters is negative
         for i,v in enumerate(parameters):
             if v < 0:
+                #If it is, take its modulo
                 parameters[i] = 0 - v
 
+        #Loop over experiments
         for id in self.session.data.experiments:
 
             #Get the experiment object 
@@ -782,7 +866,7 @@ class model_solver():
             #Get the times    
             times = experiment.times
 
-            #Check the times include 0 and 1
+            #Check the times include 0
             if not 0.0 in times:
                 times.insert(0,0.0)
 
@@ -795,37 +879,38 @@ class model_solver():
 
                 #Use concentration data if the reactant is a time_series
                 if isinstance(experiment.data[reactant],time_series):
-                    expected = self.subset_conc(modelled_data[reactant],observed)
+                    expected = self.__subset_conc(modelled_data[reactant],observed)
                     #Calculate the square difference and add it to the running total
-                    total += self.conc_square_difference(expected,observed)
+                    total += self.__conc_square_difference(expected,observed)
 
                 #Use rate data if the reactant is a rate object    
                 elif isinstance(experiment.data[reactant],rate):
-                    expected = self.subset_rate(modelled_data[reactant],observed)
+                    expected = self.__subset_rate(modelled_data[reactant],observed)
                     #Calculate the suqare difference and add it to the running total
-                    total += self.point_square_difference(observed.rate,expected)
+                    total += self.__point_square_difference(observed.rate,expected)
 
         #Return the total squared difference
+        logging.debug('Using parameters of "%s", total squared difference between the data and the model is %s' % (parameters, total))
         return total
 
-    def conc_square_difference(self,expected,observed):
+    def __conc_square_difference(self,expected,observed):
 
         """Return the square difference between calculated and observed concentrations"""
 
         total = 0
 
         for i,a in enumerate(expected.concentrations):
-            total += self.point_square_difference(a,observed.concentrations[i])
+            total += self.__point_square_difference(a,observed.concentrations[i])
 
         return total
 
-    def point_square_difference(self,a,b):
+    def __point_square_difference(self,a,b):
 
         """Return the square difference of a and b"""
 
         return ((a - b)**2)
 
-    def subset_conc(self,expected,observed):
+    def __subset_conc(self,expected,observed):
 
         """Return only the expected concentrations calculated for time points present in the observed concentrations"""
 
@@ -836,14 +921,9 @@ class model_solver():
 
         return time_series(observed.time_points,data_subset)
 
-    def subset_rate(self,expected,observed):
+    def __subset_rate(self,expected,observed):
 
         """Return only the expected rate calculated for time of the observed rate"""
-
-        #If the time is 0, return the rate for 1
-
-        if not observed.time:
-            observed.time = 1.0
 
         return expected['rate'][expected['time'].index(observed.time)]
 
@@ -851,14 +931,23 @@ class model_solver():
 
         """Return a random initial guess"""
 
+        logging.info('Generating a random initial guess at the model parameters')
+
+        #Make an empty list to hold the guesses
         initial_guess = []
         for i in range(len(self.session.model.kinpy_model.debug_k)):
+
+            #Each guess is a random integer between 0 and 9
+            #added to a random float between 0 and 1
+            #and raised to a random exponent between -3 and 3
+            
             integer = random.randint(0,9)
             float = random.random()
             exponent = random.randint(0,5) - 3
             
             initial_guess.append((integer+float)*10**exponent)
 
+        logging.debug('Randomly generated parameters are: %s' % initial_guess)
         return initial_guess
 
 class BeakerException(Exception):
