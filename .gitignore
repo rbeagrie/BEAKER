@@ -1,0 +1,6 @@
+*.pyc
+Binaries/*
+build
+makeBinary.bat
+MANIFEST
+makeInstaller.bat

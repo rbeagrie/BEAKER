@@ -1,0 +1,453 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+      "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=iso-8859-1" />
+  <title>Welcome to the Beaker Tutorial!</title>
+  <meta name="generator" content="Amaya, see http://www.w3.org/Amaya/" />
+</head>
+
+<body>
+<h1>Welcome to the Beaker tutorial!</h1>
+
+<p>This tutorial aims to introduce Beaker as a tool for finding the rate
+constants of chemical reactions. It covers creating Beaker projects, defining
+reaction models, importing data and finding solutions. Throughout this
+tutorial, instructions that require the user to do something are
+<strong>highlighted in bold.</strong></p>
+
+<h2>1. Working with Beaker projects</h2>
+
+<p>The first step is to create a new project file for Beaker to work with. To
+do this go to <strong>File &gt; New Project</strong>.</p>
+
+<p>This will open up the "New Project" dialog box.</p>
+
+<h3>1.1 Creating a new project</h3>
+
+<p><img alt="" src="new_project.jpg" /></p>
+
+<p>The "New Project" dialog box contains three options. The first is the
+project name, you should enter something meaningful here to make it easy to
+find the project again the next time you run Beaker. In this case,
+<strong>enter "Tutorial"</strong>.</p>
+
+<p>The second option is the project units. Every time you enter some data into
+Beaker, the units you use must have the same order of magnitude (e.g. mM for
+concentrations or mM / s for rates). When you come to finding values for your
+microscopic rate constants, these values will be returned with the same units
+that you used for entering data. In this case, <strong>select "mM"</strong>.</p>
+
+<p>Finally you must select a project directory, which will be used to store
+your project files. By default Beaker uses My Documents/Beaker on Windows. You
+can leave this setting as it is, unless you wish to store your Beaker files
+somewhere else.</p>
+
+<p>Now <strong>click Save</strong> to continue.</p>
+
+<h3>1.2 The project panel</h3>
+
+<p><img alt="" src="project_pane.jpg" /></p>
+
+<p></p>
+
+<p>Once you have created your project, the project panel will become available.
+The project panel will display information about the current Beaker project,
+including the name, units and project directory. It will also display more
+information as you continue to add more data to the Beaker project.</p>
+
+<h3>1.3 Modifying projects</h3>
+
+<p>The project settings you have just defined can be modified easily from the
+File &gt; Edit Project menu option. Projects can also be opened, saved and
+closed from the File menu.</p>
+
+<h2>2. Defining reaction models</h2>
+
+<p>Beaker offers a number of different methods for defining a reaction
+model.</p>
+
+<h3>2.1 Choosing a pre-specified model</h3>
+
+<p>From the top menu bar select <strong>Model &gt; Pick Model &gt; Competing
+Reactions</strong>. This will load a pre-defined model definition into the
+current Beaker project. </p>
+
+<h3>2.2 The Model panel</h3>
+
+<p>Now that you have defined a reaction model, the Model panel will become
+available to select, next to the Project panel. <strong>Select the Model
+panel</strong>, and you will see some information about the reaction model you
+just loaded.</p>
+
+<p><img alt="" src="model_pane.jpg" /></p>
+
+<p>The first line of the Model panel gives a brief summary of your model. In
+this case, the model contains two reactions and those reactions contain a total
+of 4 reactants (in this case A, B, C and D).</p>
+
+<p>After the summary line, details are printed for each reaction. Substrates
+are given on the left and products on the right. The microscopic rate constant
+for the forward reaction is given above the equilibrium arrow, whilst the
+reverse rate constant is given below. In this case, our model definition does
+not explicitly include these constants, so Beaker has named them Kf and Kr,
+followed by the number of the reaction to which they belong.</p>
+
+<p><strong>2.3 Editing a reaction model</strong></p>
+
+<p>From the menu bar, select <strong>Model &gt; View/Edit Model</strong> to
+bring up the model editing dialog box.</p>
+
+<p><img alt="" src="edit_model.jpg" /></p>
+
+<p>Beaker models are defined in plain text, and this text can be displayed or
+edited in the model editing dialog box. There are a few simple rules for
+defining Beaker reaction models:</p>
+<ol>
+  <li>Each reaction is defined on a seperate line</li>
+  <li>Lines beginning with '#' are comments</li>
+  <li>Each item is seperated by a space</li>
+  <li>The forward and reverse parts of the reaction are separated by
+    '&lt;-&gt;', which indicates a dynamic equilibrium.</li>
+  <li>Reactants on the same side of a '&lt;-&gt;' symbol are seperated by
+  '+'</li>
+  <li>Where n identical reactants are involved, this is indicated by an 'n*'
+    preceding the name of the reactant without a space (where n is the number
+    of identical reactants)</li>
+</ol>
+
+<p>So in this example, two A reactants react with one B reactant to form C, and
+one A reactant reacts with one C reactant to form one D reactant.</p>
+
+<p>Suppose we want to change the model so that the second reaction produces an
+additional product, E. Simply <strong>change the second reaction to read 'A + C
+&lt;-&gt; D + E', then click Save.</strong></p>
+
+<p>Once this is done, you should see that the Model panel has been updated to
+reflect the new product.</p>
+
+<h3>2.4 Checking the reaction model</h3>
+
+<p>At this point, we might want to check the reaction model we have defined to
+ensure it behaves as we expect. Select <strong>Model &gt; Run
+Simulation</strong> from the menu bar.</p>
+
+<p><img alt="" src="simulate_reaction_1.jpg" /></p>
+
+<p>The simulate reaction dialog box allows you to see how the reaction you have
+defined would behave under a certain set of conditions. By default, Beaker
+selects a value of 1.0 for all of the rate constants, and for the initial
+concentrations of each reactant. Under these conditions, the reaction model we
+have defined lies at equilibrium, so all we see is a flat line. Say we are
+interested in the behaviour of the system when equal parts of A and B are added
+together in the absence of the other reactants. <strong>Change the initial
+concentrations of C, D and E to 0.0, then click Update.</strong></p>
+
+<p><img alt="" src="simulate_reaction_2.jpg" /></p>
+
+<p>Now we can see how the concentrations of our five reactants change over
+time. Each reactant is displayed in a different colour, with a key to the
+colours displayed on the right. We see that the concentrations of A and B (blue
+and red respectively) decrease over time, whilst C and D increase. Whilst the
+key indicates that reactant E should be visible in orange, it cannot be seen in
+this display. <strong>Click the checkbox next to D in the display key to turn
+off the display of reactant D</strong>. This reveals that reactant E is
+produced at exactly the same rate as D and was therefore hidden when D was
+displayed.</p>
+
+<p>Our simulation shows that the reaction would reach equilibrium after about 5
+seconds. Supposing we were interested only in the pre-equilibrium behaviour, we
+can ask Beaker to only simulate the first 5 seconds of the reaction.
+<strong>Change the end time from 30 to 5 seconds in the bottom left entry box,
+then click Update</strong>.</p>
+
+<p><img alt="" src="simulate_reaction_3.jpg" /></p>
+
+<h3>2.5 Defining reaction model rate constants</h3>
+
+<p>What if we want to define the name or value of one of the microscopic rate
+constants ourselves? This is easily accomplished. From the top menu select
+<strong>Model &gt; Pick Model &gt; Michaelis Menten</strong> and examine the
+reaction model we have loaded in the model pane. Whilst the first reaction has
+the default rate constants (Kf1 and Kr1) the second reaction has had its
+forward rate constant renamed Kcat, and its reverse rate constant set to 0. To
+see how this has been accomplished, select <strong>Model &gt; View/Edit
+Model</strong> from the top menu.</p>
+
+<p><img alt="" src="edit_model_2.jpg" /></p>
+
+<p>The first line of the model we have loaded is a comment, and the second and
+third are reaction definitions of the sort we met previously. The fourth line
+is a rate constant definition. The rules for rate constant definitions are as
+follows:</p>
+<ol>
+  <li>Rate constant definitions must start with an exclamation mark: '!'</li>
+  <li>Rate constant definitions must follow the reaction to which they
+  apply</li>
+  <li>Rate constant definitions must not contain spaces</li>
+  <li>The forward rate constant definition must be preceded by 'kf=' and the
+    reverse by 'kr='</li>
+  <li>If both definitions are present they must be seperated by a semi-colon:
+    ';'</li>
+  <li>Definitions may contain any combination of numbers, letters and the four
+    traditional arithmetic operators (+, -, / and *)</li>
+</ol>
+
+<p>In this case both forward and reverse rate constants are defined for the
+second reaction.</p>
+
+<h2>3 Importing data</h2>
+
+<p>Usually when we use Beaker we want to find values for the microscopic rate
+constants of a real reaction. In order to do this, we must import some data
+from a real reaction into Beaker.</p>
+
+<h3>3.1 Acceptable data format</h3>
+
+<p>Beaker accepts data in a tab delimited format. The files we will be using
+are named 'tutorial concentration data.txt' and 'tutorial rate data.txt', which
+you should be able to find in the 'Tutorial' directory of your Beaker install
+directory.</p>
+
+<p><strong>Open the'tutorial concentration data.txt' file in a text
+editor.</strong> This file is a list of concentration measurements, taken at a
+series of times. You will see that the file has a simple structure, with the
+first line containing a list of headings seperated by tabs, and the following
+lines containing the data (and also seperated by tabs). Note that the headings
+in this file are T, S and P.</p>
+
+<h3>3.2 Importing concentration data</h3>
+
+<p>From the top menu, select <strong>Data &gt; Import Concentration
+Data</strong>. Now <strong>find the 'tutorial concentration data.txt' file
+again and click Open</strong>. You will see the import concentration data
+dialog box, shown below.</p>
+
+<p><img alt="" src="import_concentration_data.jpg" /></p>
+
+<p>This dialog box shows the column heading and the first four rows of data for
+the three columns in our 'tutorial concentration data.txt' file. What we need
+to do know is let Beaker know which columns correspond to which reactants as
+defined by our model. We also need to tell Beaker the time at which each of
+these concentration measurements was taken. <strong>Assign the 'P' column to
+Product by selecting Product from the dropdown box over the P column. Now
+assign the 'S' column to Substrate and the 'T' column to Time.</strong></p>
+
+<p><strong>Click Continue.</strong> You will now see the assign starting
+concentrations dialog box.</p>
+
+<p><img alt="" src="import_concentration_data_2.jpg" /></p>
+
+<p>In this experiment, we measured the concentration of Product and Substrate
+at time 0. However, since we did not measure the concentration of Enzyme or of
+ES-complex, Beaker now needs to know what the concentrations of these species
+were at time 0. <strong>Set the concentration of Enzyme to 1.0, but leave the
+concentration of ES-Complex at 0.0. Click Save.</strong></p>
+
+<h3>3.3 Importing rate data</h3>
+
+<p>Beaker works best when we can supply concentration measurements taken over a
+range of times. However, Beaker can also accept measurements of the initial
+rate of change of a reactant made over a series of concentrations. Data of this
+sort is contained in the file 'tutorial rate data.txt', which we will import
+now.</p>
+
+<p>From the top menu, select <strong>Data &gt; Import Rate Data</strong>.
+<strong>Now locate and select the 'tutorial rate data.txt' file.</strong> You
+will now see the import rate data dialog box.</p>
+
+<p>The import rate data dialog box is identical to the import concentration
+data dialog box, except that when you assign a column to a reactant defined in
+the model, you must also specify whether the column represents measured rates
+of change for that reactant, or initial concentrations of that reactant. In
+this case the rate of change of Substrate and Product were measured over a
+range of Substrate concentrations. <strong>Assign the S_Conc column to
+Substrate Concentration, the S_Rate column to Substrate Rate and the P_Rate
+column to Product Rate. Click Continue.</strong></p>
+
+<p>As before, we are shown the assign starting concentrations dialog box.
+<strong>Set the Enzyme concentration to 1.0 again and leave the ES-Complex and
+Product concentrations at 0.0.</strong></p>
+
+<h3>3.4 The Data panel</h3>
+
+<p>Now that we have imported some data, the Data panel has become available.
+<strong>Click on the Data panel.</strong></p>
+
+<p><img alt="" src="view_concentration_data.jpg" /></p>
+
+<p>The data panel shows a list of experiments on the left, and the details of
+the data entered for each experiment on the right. Experiment 1 contains all of
+the data from 'tutorial concentration data.txt'. At the top of the panel the
+starting concentrations of each reactant are listed, and underneath there is a
+table containing all of the concentration measurements and times imported from
+the text file. Now <strong>select Experiment 2 from the list on the left of the
+panel.</strong></p>
+
+<p><img alt="" src="view_concentration_data_2.jpg" /></p>
+
+<p>Experiments 2 through 12 each display information from one single line of
+'tutorial rate data.txt'. In the case of rate data, each line is a different
+experiment because each line represents data taken from a different set of
+starting concentrations. For rate data, the starting concentrations are
+displayed on the left, and the measured rates of change for each reactant are
+displayed on the right.</p>
+
+<h2>4. Determining microscopic rate constants</h2>
+
+<p>The final stage of the process is for Beaker to find the set of rate
+constants which allow the defined reaction model to most closely match the
+imported data - this is known as the 'solution' of the model.</p>
+
+<h3>4.1 Quick Solutions</h3>
+
+<p>To find a solution quickly, from the top menu select <strong>Solutions &gt;
+Quick Solution</strong>. This will bring up the solving dialog box.</p>
+
+<p><img alt="" src="quick_solve.jpg" /></p>
+
+<p>The solving dialog box gives you an estimate of the progress Beaker has made
+towards finding a solution. Once a solution has been found, this dialog box
+disappears and is replaced by the soultion found dialog.</p>
+
+<p><img alt="" src="solution_found.jpg" /></p>
+
+<p>The solution found dialog box lists the rate constant values that Beaker
+thinks most closely fit the provided data. <strong>Click OK to dismiss the
+solution found dialog box.</strong></p>
+
+<h3>4.2 The Solutions panel</h3>
+
+<p>Beaker returns the best solution it can find using the data provided by the
+user. This does not necessarily mean that the solution is a good one. In order
+to confirm that the set of rate constants gives a good fit to the data
+provided, we need to examine the solution. <strong>Click on the Solutions
+panel.</strong></p>
+
+<p><strong><img alt="" src="solutions_panel_1.jpg" /></strong></p>
+
+<p>The solutions panel contains all the information about every solution Beaker
+has found for this project. In the leftmost column there is a list of all the
+solutions found. Since we have only found one solution, we have only one entry
+available. The next column contains the details of the solution.</p>
+
+<p>For each of the rate constants, Beaker lists the initial guess and the final
+value. Beaker finds solutions by refining an initial guess, and when you
+perform a Quick Solution, the initial guess defaults to a value of 1.0 for
+every constant. The final values are the same as those listed by the solution
+found dialog box that we encountered earlier.</p>
+
+<p>Below the rate constant values are three parameters relating to the quality
+of the solution. The first is the Squared Difference, which is a measurement of
+the difference between the provided data and the predictions of the model using
+this solution. Because it is a measure of difference, lower values mean a
+better solution.</p>
+
+<p>Solver Iterations and Function Calls are both measures of how much work
+Beaker had to do to reach the current solution. This can depend on a number of
+things, including the initial guess used and the complexity of the model.</p>
+
+<p>Finally, in the right hand column is a section that allows us to compare the
+model predictions to the imported data directly. The drop down list at the top
+allows us to pick an experiment to compare with the solution.</p>
+
+<p>Experiment 1 should be selected, which contains all of the data from
+'tutorial concentration data.txt'. This data is displayed as two different
+coloured sets of circles, representing the two reactants whose concentrations
+we measured. The predictions of the model (based on this solution) are shown as
+lines, the same colour as the circles. In this case, you can see that the line
+(solution) follows the circles (data) extremely well - so we can be confident
+that the solution is a good one for this data set.</p>
+
+<p><strong>Now select experiment 2. </strong></p>
+
+<p><img alt="" src="solutions_panel_2.jpg" /></p>
+
+<p>This experiment is one of the twelve imported from 'tutorial rate data.txt'.
+As with experiment 1, you can see the predictions of the model based on the
+solution displayed as a solid coloured line. This experiment contains two
+measurements - the rate of change of Product and the rate of change of
+Substrate at 1 second following reaction start. Each rate is displayed as a
+black line, centred at the point on the prediction where the measurement was
+taken (indicated as before by a coloured circle). For our solution to be a good
+fit to the experimental data for this experiment, we want the black line to be
+tangent to the coloured line. In both cases, the measured rates are very good
+tangents to the model predictions, so our solution looks to hold for this
+experiment too. You can check the other experiments yourself, they should all
+be good fits to the imported data.</p>
+
+<h3>4.3 The advanced solution finder</h3>
+
+<p>In order to distinguish good solutions from bad ones, it helps to have some
+experience of what a bad solution might look like. We can force Beaker to find
+a bad solution by using the advanced solution finder panel. From the top menu
+bar select <strong>Solutions &gt; Advanced Solution</strong>.</p>
+
+<p><img alt="" src="advanced_solve.jpg" /></p>
+
+<p>This is the advanced solution finder dialog box, which enables you fine
+grained control over all of the settings for solution finding. The top part of
+the dialog box deals with the initial values Beaker will try and refine until
+it finds a solution. In this case, since we are forcing beaker to find a poor
+solution, we will enter some parameter values which are far away from the true
+solution. <strong>Click on the radiobutton labelled specified</strong>. This
+tells Beaker that we are going to provide our own estimates for the parameter
+values. <strong>Leave Kr1 as it is, but change Kcat to 10 and Kf1 to
+0.1.</strong></p>
+
+<p>The next section deals with the algorithm Beaker will use to find a
+solution, and the options for that particular algorithm. All of the algorithms
+are provided by the scientific python library SciPy, and details for how these
+parameters affect the algorithm output can be found in their documentation (<a
+href="http://docs.scipy.org/doc/scipy-0.7.x/reference/optimize.html">http://docs.scipy.org/doc/scipy-0.7.x/reference/optimize.html</a>).
+For now, it will be sufficient to <strong>change the parameter maxfun to 5,
+then click Save.</strong></p>
+
+<p>Accept the values given by the solution found dialog, then <strong>go to the
+Solutions panel and select solution 2</strong>. You should now see the
+comparison of the solution we just found with the imported concentration data
+in experiment 1.</p>
+
+<p><img alt="" src="poor_solution_1.jpg" /></p>
+
+<p>As you can see, this solution does not really match the imported
+concentration data at all. If you click on one of the other experiments, you
+will see that the same is true for the rate data (except for experiment 6,
+where the initial concentration of Substrate was 0, so the model behaves the
+same for any set of parameters, i.e. it does nothing at all!).</p>
+
+<h3>4.4 Finding multiple solutions</h3>
+
+<p>We have already explained that Beaker requires an initial guess to find a
+solution. This means that if there is more than one solution, the values
+returned by Beaker will be heavily dependent on the initial guess. In order to
+be more confident that the solution we found in section 4.2 is the solution and
+not simply one of many possible solutions, we would want Beaker to find a
+number of solutions using random starting points. We can do this using the
+advanced solutions dialog. From the top menu bar, select <strong>Solutions &gt;
+Advanced Solution</strong>.</p>
+
+<p><img alt="" src="advanced_solve_2.jpg" width="369" height="533" /></p>
+
+<p>This time, instead of specifying an initial guess, we leave random selected
+for the initial parameter values, and <strong>change Number of solutions to
+2</strong>. Leave all of the other parameters at their default values and
+<strong>click Save</strong>.</p>
+
+<p>Once Beaker has found two more random solutions, <strong>examine the values
+of the rate constants using the solutions panel</strong>. You should see that
+Kcat and Kf1 are identical (or very similar) in every solution. However, Kr1 is
+different in each solution.</p>
+
+<p>What we have discovered is that for the model we have defined, the value of
+Kr1 has no effect on the behaviour of the system. This is why it is important
+to test multiple randomly generated solutions before drawing conclusions about
+the values of any rate constants.</p>
+
+<p>That concludes this tutorial, thank you and good luck with using Beaker!</p>
+
+<p>If you encounter any problems or bugs, please don't hesitate to email the
+author at <a href="mailto:rob@beagrie.com">rob@beagrie.com</a>.</p>
+</body>
+</html>
