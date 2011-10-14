@@ -9,30 +9,35 @@ from Tkinter import *
 from fonts import Fonts
 import Tkinter as Tk
 import beaker.Backend.beaker as beaker
-import ttk, tkFileDialog, tkMessageBox, os, logging, cPickle, threading, time, traceback, subprocess
+import ttk, tkFileDialog, tkMessageBox, os, logging, cPickle, threading, time, traceback, subprocess, Plugins
 
-import beaker.refs as refs, beaker.version as version
+import refs,version
+
+
+
+#Create the main window
+
+
+'''
+mainframe = ttk.Frame(root, padding="1 1 1 1")
+mainframe.grid(column=0, row=0, sticky=(N, W, E, S))
+
+mainframe.columnconfigure(0, weight=1)
+mainframe.rowconfigure(0, weight=1)
+mainframe.rowconfigure(1, weight=0)
+'''
 
 def tryFloat(f):
-
-    """Try to convert f to a float
-
-    Any time we need the user to input a float, call this method to make sure their entry is valid."""
-    
     try:
         return float(f)
     except:
-        
-        #If we couldn't convert to a float, raise a beaker exception
         raise beaker.BeakerException('%s is not a valid number.' % f)
 
 
 
 class AutoScrollbar(Scrollbar):
-    """Create a scrollbar that hides itself if it's not needed.
-
-    only works if you use the grid geometry manager."""
-    
+    # a scrollbar that hides itself if it's not needed.  only
+    # works if you use the grid geometry manager.
     def set(self, lo, hi):
         if float(lo) <= 0.0 and float(hi) >= 1.0:
             # grid_remove is currently missing from Tkinter!
@@ -46,62 +51,42 @@ class AutoScrollbar(Scrollbar):
         raise TclError, "cannot use place with this widget"
 
 class BkToplevel(Toplevel):
-    """Create a toplevel window with the Beaker icon"""
-    
     def __init__(self,parent):
-        
-        #Inherit from Toplevel
         Toplevel.__init__(self,parent)
-        
-        #Set the icon
         self.wm_iconbitmap(refs.iconpath)
 
 class ScrolledCanvas(Frame):
-    """Create a frame with an auto-scrollbar attached.
-
-    Items to be added to the frame should be added to %OBJECT%.frame not to the parent %OBJECT% itself.
-
-    Once all the items have been added to the inner frame, call update() to set the size of the canvas."""
-    
     def __init__(self,parent):
-
-        # Inherit from Frame
+        wd=parent.winfo_width()
         Frame.__init__(self,parent)
-        
-        # Create two scrollbars for x and y
+
         vscrollbar = AutoScrollbar(self)
         vscrollbar.grid(row=0, column=1, sticky=N+S)
         hscrollbar = AutoScrollbar(self, orient=HORIZONTAL)
         hscrollbar.grid(row=1, column=0, sticky=E+W)
 
-        # Create a canvas to attach the scrollbar to
         self.canvas = Canvas(self,
                         yscrollcommand=vscrollbar.set,
                         xscrollcommand=hscrollbar.set)
         self.canvas.grid(row=0, column=0, sticky=N+S+E+W)
 
-        # Get rid of ugly canvas border
         self.canvas['highlightcolor'] = self.canvas['highlightbackground']
 
-        # Attach the scrollbars to the canvas
         vscrollbar.config(command=self.canvas.yview)
         hscrollbar.config(command=self.canvas.xview)
 
-        # Make the canvas expandable
+        # make the canvas expandable
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        # Create an inner frame to hold the contents
+        #
+        # create canvas contents
+
         self.frame = Frame(self.canvas)
         self.frame.rowconfigure(1, weight=1)
         self.frame.columnconfigure(1, weight=1)
 
     def update(self,w=False,h=False):
-
-        """Call this once all objects have been added to the inner frame
-
-        set w or h to True to stop either the width or height of the canvas
-        expanding to fill all the available space in the parent frame."""
 
         self.canvas.create_window(0, 0, anchor=NW, window=self.frame)
 
@@ -286,11 +271,13 @@ class MainMenu(Menu):
         self.menus['Model'] = Menu(self)
         self.menus['Data'] = Menu(self)
         self.menus['Solve'] = Menu(self)
+        self.menus['Plugins'] = Menu(self)
         self.menus['Help'] = Menu(self)
         self.add_cascade(menu=self.menus['File'], label='File')
         self.add_cascade(menu=self.menus['Model'], label='Model')
         self.add_cascade(menu=self.menus['Data'], label='Data')
         self.add_cascade(menu=self.menus['Solve'], label='Solutions')
+        self.add_cascade(menu=self.menus['Plugins'], label='Plugins')
         self.add_cascade(menu=self.menus['Help'], label='Help')
 
         #Add 'File' sub menu items
@@ -326,6 +313,10 @@ class MainMenu(Menu):
         self.menus['Solve'].add_command(label='Advanced Solution', command=self.advancedSolve)
         self.menus['Solve'].add_separator()
         self.menus['Solve'].add_cascade(menu=self.viewSolution, label='View Solution')
+
+        #Add 'Plugins' sub menu items
+        for label in Plugins.installed:
+            self.menus['Plugins'].add_command(label=label,command=lambda : Plugins.installed[label].Start(self.main,self.main.project))
 
         #Add 'Help' sub menu items
         self.LoggingChoices = Menu(self)
@@ -581,7 +572,19 @@ class MainMenu(Menu):
             'Model' : 1,
             'Data' : 2,
             'Solve' : 3,
-            'Help' : 4}
+            'Plugins' : 4,
+            'Help' : 5}
+
+        self.addPlugins()
+
+    def addPlugins(self):
+        for label in Plugins.installed:
+            for state in Plugins.installed[label].enabledStates:
+                try:
+                    self.states[state]['Plugins'][label] = True
+                except:
+                    self.states[state]['Plugins'] = {}
+                    self.states[state]['Plugins'][label] = True
 
     def setState(self,state):
 
@@ -855,7 +858,7 @@ class DataPane(Frame):
         Frame.__init__(self,parent)
         self['padx'] = 10
         self['pady'] = 20
-        self.columnconfigure(5,weight=1)
+        self.columnconfigure(4,weight=1)
 
         self.main = main
         self.model = self.main.project.model
@@ -871,7 +874,7 @@ class DataPane(Frame):
         self.experiments = self.main.project.data.experiments
 
         self.dataframe = ttk.Frame(self, padding='15 0 0 0')
-        self.dataframe.grid(column=2,row=2, sticky=(N,W,E,S))
+        self.dataframe.grid(column=1,row=2, sticky=(N,W,E,S))
         
         self.experiment_names = []
         for e in self.main.project.data.experiments:
@@ -883,13 +886,8 @@ class DataPane(Frame):
         self.selector = Listbox(self)
         self.selector.bind('<<ListboxSelect>>', self.change)
         self.selector['listvariable'] = self.experiments
-        self.selector.grid(column=0,row=1,rowspan=10,sticky='NS')
+        self.selector.grid(column=0,row=1,rowspan=10,sticky='N')
         self.selector.selection_set(0)
-
-        s = AutoScrollbar(self, orient=VERTICAL, command=self.selector.yview)
-        s.grid(column=1, row=1, rowspan=10, sticky=(N,S))
-        self.selector['yscrollcommand'] = s.set
-        
         self.change()
 
     def change(self,*Args):
@@ -913,14 +911,14 @@ class DataPane(Frame):
         self.labels = []
 
         self.labels.append(ttk.Label(self,text='Starting Concentrations:',font='BkLargeBold', padding='15 0 0 10'))
-        self.labels[len(self.labels)-1].grid(column=2,row=0,columnspan=2,sticky='NW')
+        self.labels[len(self.labels)-1].grid(column=1,row=0,columnspan=2,sticky='NW')
         row=1
         for reactant in experiment.data:
             conc = experiment.data[reactant].starting_concentration
             self.labels.append(ttk.Label(self,text=reactant,font='BkBold', padding='15 5 0 0'))
-            self.labels[len(self.labels)-1].grid(column=2,row=row,sticky='NW')
+            self.labels[len(self.labels)-1].grid(column=1,row=row,sticky='NW')
             self.labels.append(ttk.Label(self,text='= %.4f %s'% (conc,self.main.concUnit()), padding='15 5 0 0'))
-            self.labels[len(self.labels)-1].grid(column=3,row=row,sticky='NW')
+            self.labels[len(self.labels)-1].grid(column=2,row=row,sticky='NW')
             row += 1
 
             if isinstance(experiment.data[reactant],beaker.time_series):
@@ -933,11 +931,11 @@ class DataPane(Frame):
         if len(self.rawdata) > 0:
 
             self.labels.append(ttk.Label(self,text='Concentration Data:',font='BkLargeBold', padding='15 15 0 0'))
-            self.labels[len(self.labels)-1].grid(column=2,row=row,columnspan=2,sticky='NW')
+            self.labels[len(self.labels)-1].grid(column=1,row=row,columnspan=2,sticky='NW')
             row += 1
 
             self.dataframe = ttk.Frame(self, padding='15 15 0 0')
-            self.dataframe.grid(column=2,row=row, sticky=(N,W,E,S),columnspan=4)
+            self.dataframe.grid(column=1,row=row, sticky=(N,W,E,S),columnspan=4)
             self.dataframe.columnconfigure(0,weight=1)
             self.dataframe.rowconfigure(0,weight=1)
             self.rowconfigure(row,weight=1)
@@ -964,13 +962,13 @@ class DataPane(Frame):
         else:
             row = 0
             self.labels.append(ttk.Label(self,text='Rates of Change:',font='BkLargeBold', padding='35 0 0 10'))
-            self.labels[len(self.labels)-1].grid(column=4,row=row,columnspan=2,sticky='NW')
+            self.labels[len(self.labels)-1].grid(column=3,row=row,columnspan=2,sticky='NW')
             row += 1
             for i in range(len(self.headings)):
                 self.labels.append(ttk.Label(self,text=self.headings[i],font='BkBold', padding='35 5 0 0'))
-                self.labels[len(self.labels)-1].grid(column=4,row=row,sticky='NW')
+                self.labels[len(self.labels)-1].grid(column=3,row=row,sticky='NW')
                 self.labels.append(ttk.Label(self,text='%.4f %s' % (self.ratedata[i],self.main.rateUnit()), padding='15 5 0 0'))
-                self.labels[len(self.labels)-1].grid(column=5,row=row,sticky='NW')
+                self.labels[len(self.labels)-1].grid(column=4,row=row,sticky='NW')
                 row += 1
             self.selector.focus()
         
@@ -1850,10 +1848,10 @@ class QuickSolve(BkToplevel):
         self.s.start()
 
     def blah(self):
-        try:
+        #try:
             self.solution = self.main.project.solver.solve(call=self.updateBar,params=self.params,initial_guess=self.guess)
-        except:
-            raise beaker.BeakerException('Solver terminated prematurely.')
+        #except:
+        #    raise beaker.BeakerException('Solver terminated prematurely.')
         
     def check(self):
         if self.s.isAlive():
