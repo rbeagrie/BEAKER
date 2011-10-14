@@ -1,0 +1,4 @@
+*.pyc
+Binaries/*
+build
+makeBinary.bat
